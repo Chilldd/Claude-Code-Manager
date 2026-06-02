@@ -58,12 +58,27 @@ interface TermInstance {
   container: HTMLDivElement;
 }
 
+interface GridLayout {
+  cols: string;
+  rows: string;
+  /** Per-item CSS overrides (gridRow/gridColumn) for custom placement. */
+  positions: { gridRow?: string; gridColumn?: string }[];
+}
+
 /** Compute grid columns/rows based on item count */
-function getGridLayout(n: number): { cols: string; rows: string } {
-  if (n <= 1) return { cols: "1fr", rows: "1fr" };
-  if (n === 2) return { cols: "1fr 1fr", rows: "1fr" };
-  if (n <= 4) return { cols: "1fr 1fr", rows: "1fr 1fr" };
-  return { cols: "1fr 1fr", rows: "1fr 1fr" }; // cap at 4
+function getGridLayout(n: number): GridLayout {
+  if (n <= 1) return { cols: "1fr", rows: "1fr", positions: [] };
+  if (n === 2) return { cols: "1fr 1fr", rows: "1fr", positions: [] };
+  if (n === 3) {
+    // First session spans left column full height; two share the right column
+    return {
+      cols: "1fr 1fr",
+      rows: "1fr 1fr",
+      positions: [{ gridRow: "1 / 3" }, {}, {}],
+    };
+  }
+  if (n <= 4) return { cols: "1fr 1fr", rows: "1fr 1fr", positions: [] };
+  return { cols: "1fr 1fr", rows: "1fr 1fr", positions: [] }; // cap at 4
 }
 
 /** Refit visible terminals */
@@ -308,6 +323,8 @@ export function TerminalPanel({
       if (sid === selectedSessionId) continue;
       inst.container.style.display = "none";
       inst.container.classList.remove("active");
+      inst.container.style.gridRow = "";
+      inst.container.style.gridColumn = "";
     }
 
     if (count > 0) {
@@ -317,10 +334,14 @@ export function TerminalPanel({
       root.style.gridTemplateColumns = layout.cols;
       root.style.gridTemplateRows = layout.rows;
 
-      for (const sid of visibleIds) {
+      visibleIds.forEach((sid, i) => {
         const inst = instances.get(sid);
-        if (!inst) continue;
+        if (!inst) return;
         inst.container.style.display = "block";
+        // Apply (or clear) per-item grid placement for uneven layouts (e.g. 3)
+        const pos = layout.positions[i];
+        inst.container.style.gridRow = pos?.gridRow ?? "";
+        inst.container.style.gridColumn = pos?.gridColumn ?? "";
         const isActive = sid === selectedSessionId;
         inst.container.classList.toggle("active", isActive);
 
@@ -338,7 +359,7 @@ export function TerminalPanel({
           });
           inst.container.appendChild(overlay);
         }
-      }
+      });
       if (selectedSessionId) {
         const inst = instances.get(selectedSessionId);
         if (inst) {
