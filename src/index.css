@@ -1,0 +1,149 @@
+/* ══════════════════════════════════════════════════
+   Windows Terminal "Dark+" Theme — Base Layer
+   ══════════════════════════════════════════════════ */
+
+:root {
+  /* ── Background layers (WT deep black → elevated) ── */
+  --bg-base: #0c0c0c;
+  --bg-surface: #141414;
+  --bg-elevated: #1c1c1c;
+  --bg-hover: #252525;
+  --bg-active: #2d2d2d;
+
+  /* ── Acrylic / glass simulation ── */
+  --acrylic-bg: rgba(18, 18, 18, 0.82);
+  --acrylic-border: rgba(255, 255, 255, 0.05);
+  --acrylic-shimmer: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    rgba(96, 205, 255, 0.03) 50%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+
+  /* ── Text ── */
+  --text-primary: #e8e8e8;
+  --text-secondary: #9d9d9d;
+  --text-muted: #5e5e5e;
+  --text-dim: #3e3e3e;
+
+  /* ── Borders ── */
+  --border: #383838;
+  --border-subtle: #252525;
+  --border-acrylic: rgba(255, 255, 255, 0.06);
+
+  /* ── Accent (Windows 11 blue) ── */
+  --accent: #60cdff;
+  --accent-hover: #7ad5ff;
+  --accent-dim: rgba(96, 205, 255, 0.12);
+  --accent-glow: rgba(96, 205, 255, 0.25);
+
+  /* ── Status ── */
+  --success: #6a9955;
+  --warning: #d7ba7d;
+  --danger: #f44747;
+  --danger-dim: rgba(244, 71, 71, 0.12);
+
+  /* ── Fonts ── */
+  --font-ui: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Cascadia Code', 'Cascadia Mono', 'Consolas', 'Courier New', monospace;
+
+  /* ── Radii ── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+
+  /* ── Transitions ── */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Reset ── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+body {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Selection ── */
+::selection {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+}
+
+/* ── Scrollbar (global) ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ── Focus ring ── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes tabAppear {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
