@@ -206,6 +206,7 @@ export function TerminalPanel({
       const term = new Terminal({
         cursorBlink: true,
         cursorStyle: "bar",
+        cursorInactiveStyle: "none",
         cursorWidth: 2,
         fontSize: 14,
         lineHeight: 1.2,
