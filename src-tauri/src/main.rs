@@ -124,7 +124,75 @@ fn handle_deep_link(app: &tauri::AppHandle, session_id: &str) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
+
+        // ── Bring window to foreground ──
+        // SetWindowPos with HWND_TOPMOST changes Z-order without needing the
+        // Windows foreground-lock permission, bringing the window above all
+        // others.  We immediately revert to HWND_NOTOPMOST so it doesn't
+        // stay "always on top" permanently.
+        #[cfg(target_os = "windows")]
+        unsafe {
+            use raw_window_handle::HasWindowHandle;
+            use windows::Win32::Foundation::HWND;
+            use windows::Win32::UI::WindowsAndMessaging::{
+                SetWindowPos, ShowWindow, SW_RESTORE,
+                HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+                SWP_SHOWWINDOW, IsIconic,
+            };
+            if let Ok(handle) = window.window_handle() {
+                if let raw_window_handle::RawWindowHandle::Win32(win32) = handle.as_raw() {
+                    let hwnd = HWND(win32.hwnd.get() as _);
+                    if IsIconic(hwnd).as_bool() {
+                        let _ = ShowWindow(hwnd, SW_RESTORE);
+                    }
+                    let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                    let _ = SetWindowPos(hwnd, Some(HWND_NOTOPMOST), 0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                }
+            }
+        }
         let _ = window.set_focus();
+
+        // ── Focus xterm with user activation ──
+        // The browser blocks element.focus() without a user gesture, and the
+        // notification-click path has no JS user activation.  We inject a
+        // real Windows input event via SendInput (OS-level, treated as user
+        // input by the browser), then capture it in a one-shot keydown
+        // listener that runs WITH user activation and focuses the textarea.
+        let sid = session_id.replace('\\', "\\\\").replace('\'', "\\'");
+        let js = format!(
+            r#"(function(){{
+                var sid = '{0}';
+                var handler = function(){{
+                    window.removeEventListener('keydown', handler, true);
+                    var poll = function(){{
+                        var el = document.querySelector('[data-sid="'+sid+'"]');
+                        if(el){{ var ta = el.querySelector('.xterm-helper-textarea'); if(ta){{ ta.focus(); return; }} }}
+                        setTimeout(poll, 20);
+                    }};
+                    poll();
+                }};
+                window.addEventListener('keydown', handler, true);
+            }})()"#,
+            sid
+        );
+        let _ = window.eval(&js);
+
+        // Inject a virtual key-press via SendInput to trigger the listener
+        // above with transient user activation in the browser.
+        #[cfg(target_os = "windows")]
+        unsafe {
+            use windows::Win32::UI::Input::KeyboardAndMouse::{
+                SendInput, INPUT, INPUT_KEYBOARD, KEYEVENTF_KEYUP,
+            };
+            let mut inputs = [INPUT::default(); 2];
+            // VK_F24 (0x87) — an unmapped key with zero side effects
+            inputs[0].r#type = INPUT_KEYBOARD;
+            inputs[0].Anonymous.ki.wVk = windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(0x87);
+            inputs[0].Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
+            let _ = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+        }
     }
 }
 
@@ -148,6 +216,11 @@ fn update_workspace(ws: workspace::Workspace) -> Vec<workspace::Workspace> {
 #[tauri::command]
 fn delete_workspace(id: String) -> Vec<workspace::Workspace> {
     workspace::delete_workspace(id)
+}
+
+#[tauri::command]
+fn reorder_workspaces(ids: Vec<String>) -> Vec<workspace::Workspace> {
+    workspace::reorder_workspaces(ids)
 }
 
 #[tauri::command]
@@ -281,14 +354,18 @@ fn main() {
 
     register_protocol();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // Forward deep-link from notification clicks (second instance) to the
+            // already-running window instead of opening a new one.
             if let Some(url) = argv.iter().find(|a| a.starts_with("yug-cc-manager://")) {
                 if let Some(sid) = parse_session_id(url) {
                     handle_deep_link(app, &sid);
                 }
             }
-        }))
+        }));
+
+    builder
         .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             // Spawn the metrics engine (background sampling + event emitter)
@@ -310,6 +387,7 @@ fn main() {
             add_workspace,
             update_workspace,
             delete_workspace,
+            reorder_workspaces,
             import_from_claude_code,
             create_pty,
             write_pty,

@@ -89,6 +89,8 @@ export const api = {
     invoke<Workspace[]>("update_workspace", { ws }),
   deleteWorkspace: (id: string) =>
     invoke<Workspace[]>("delete_workspace", { id }),
+  reorderWorkspaces: (ids: string[]) =>
+    invoke<Workspace[]>("reorder_workspaces", { ids }),
 
   createPty: (workspaceId: string, sessionName: string, command: string, args: string, cwd: string, env: Record<string, string>) =>
     invoke<string>("create_pty", { workspaceId, sessionName, command, args, cwd, env }),
@@ -175,7 +177,6 @@ export function onPtyOutput(cb: (payload: PtyOutputEvent) => void): Promise<() =
 /** Listen for PTY exit events from any session */
 export function onPtyExit(cb: (payload: PtyExitEvent) => void): Promise<() => void> {
   return listen<PtyExitEvent>("pty-exit", (event) => {
-    console.log("[event pty-exit]", event.payload);
     cb(event.payload);
   });
 }

@@ -62,6 +62,18 @@ export function useWorkspaces() {
     }
   }, []);
 
+  const reorderWorkspaces = useCallback(async (ids: string[]) => {
+    try {
+      setError(null);
+      const list = await api.reorderWorkspaces(ids);
+      setWorkspaces(list);
+      return true;
+    } catch (e) {
+      setError(String(e));
+      return false;
+    }
+  }, []);
+
   return {
     workspaces,
     loading,
@@ -70,5 +82,6 @@ export function useWorkspaces() {
     addWorkspace,
     updateWorkspace,
     deleteWorkspace,
+    reorderWorkspaces,
   };
 }

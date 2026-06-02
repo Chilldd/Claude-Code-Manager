@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { Workspace } from "../api";
 import type { SessionInfo } from "../App";
 
@@ -15,6 +16,7 @@ interface Props {
   onDelete: (workspaceId: string) => void;
   onAdd: () => void;
   onImportClaude?: () => void;
+  onReorder?: (workspaceId: string, direction: "up" | "down") => void;
 }
 
 export function WorkspacePanel({
@@ -31,7 +33,24 @@ export function WorkspacePanel({
   onDelete,
   onAdd,
   onImportClaude,
+  onReorder,
 }: Props) {
+  const [menuWsId, setMenuWsId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close menu on outside click
+  const closeMenu = useCallback(() => setMenuWsId(null), []);
+  useEffect(() => {
+    if (!menuWsId) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        closeMenu();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuWsId, closeMenu]);
+
   return (
     <div className={`workspace-panel${collapsed ? " collapsed" : ""}`}>
       <div className="workspace-header">
@@ -66,6 +85,7 @@ export function WorkspacePanel({
           workspaces.map((ws, idx) => {
             const isExpanded = expandedWorkspaces.has(ws.id);
             const wsSessions = sessions.filter((s) => s.workspaceId === ws.id);
+            const isMenuOpen = menuWsId === ws.id;
             return (
               <div key={ws.id} className="workspace-group" data-animation-index={idx > 20 ? "20+" : idx}>
                 {/* Workspace header row */}
@@ -98,20 +118,46 @@ export function WorkspacePanel({
                     >
                       +
                     </button>
-                    <button
-                      className="btn-edit"
-                      onClick={() => onEdit(ws)}
-                      title="Edit workspace"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      className="btn-delete"
-                      onClick={() => onDelete(ws.id)}
-                      title="Delete workspace"
-                    >
-                      ✕
-                    </button>
+                    {/* More actions menu */}
+                    <div className="workspace-menu-wrapper">
+                      <button
+                        className="btn-more"
+                        onClick={(e) => { e.stopPropagation(); setMenuWsId(isMenuOpen ? null : ws.id); }}
+                        title="More actions"
+                      >
+                        ⋯
+                      </button>
+                      {isMenuOpen && (
+                        <div ref={menuRef} className="workspace-menu" onClick={(e) => e.stopPropagation()}>
+                          <button onClick={() => { onEdit(ws); closeMenu(); }}>
+                            ✎ Edit
+                          </button>
+                          {onReorder && workspaces.length > 1 && (
+                            <>
+                              <button
+                                onClick={() => { onReorder(ws.id, "up"); closeMenu(); }}
+                                disabled={idx === 0}
+                              >
+                                ▲ Move up
+                              </button>
+                              <button
+                                onClick={() => { onReorder(ws.id, "down"); closeMenu(); }}
+                                disabled={idx === workspaces.length - 1}
+                              >
+                                ▼ Move down
+                              </button>
+                            </>
+                          )}
+                          <div className="workspace-menu-sep" />
+                          <button
+                            className="danger"
+                            onClick={() => { onDelete(ws.id); closeMenu(); }}
+                          >
+                            ✕ Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

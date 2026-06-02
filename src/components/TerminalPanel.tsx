@@ -1,6 +1,7 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useCallback, useState } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onPtyOutput, onPtyExit } from "../api";
 import type { PtyOutputEvent, PtyExitEvent } from "../api";
 import type { SessionInfo } from "../App";
@@ -223,12 +224,6 @@ export function TerminalPanel({
           api.writePty(session.id, "\n").catch(() => {});
           return false;
         }
-        // Ctrl+Arrow → switch sessions (prev/next in active group)
-        // All four arrows work: ←/↑ → prev, →/↓ → next (matches 2×2 grid intuition)
-        if (e.type === "keydown" && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
-          if (e.key === "ArrowLeft" || e.key === "ArrowUp") { setTimeout(() => switchSessionRef.current?.("prev"), 0); return false; }
-          if (e.key === "ArrowRight" || e.key === "ArrowDown") { setTimeout(() => switchSessionRef.current?.("next"), 0); return false; }
-        }
         return true;
       });
 
@@ -236,33 +231,32 @@ export function TerminalPanel({
       term.loadAddon(fitAddon);
       term.open(container);
 
-      // Fix IME composition window position: by default xterm hides its
-      // helper textarea off-screen, causing the native IME candidate
-      // window to appear at a random position.  During composition we
-      // move the textarea to follow the terminal cursor.
+      // Fix IME composition: position xterm's hidden helper textarea at
+      // the terminal cursor during composition so the native IME candidate
+      // window appears at the right place.  We use .xterm-screen for cell
+      // dimensions since it excludes padding.
       const imeTextarea = container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
       if (imeTextarea) {
-        const onCompositionStart = () => {
-          const termRect = term.element?.getBoundingClientRect();
-          if (!termRect) return;
-          const cellW = termRect.width / term.cols;
-          const cellH = termRect.height / term.rows;
+        const moveToCursor = () => {
+          const termEl = term.element;
+          const screen = termEl?.querySelector<HTMLDivElement>(".xterm-screen");
+          if (!screen) return;
+          const sr = screen.getBoundingClientRect();
+          const cellW = sr.width / term.cols;
+          const cellH = sr.height / term.rows;
           const cx = term.buffer.active.cursorX;
           const cy = term.buffer.active.cursorY;
           imeTextarea.style.position = "fixed";
-          imeTextarea.style.left = `${termRect.left + cx * cellW}px`;
-          imeTextarea.style.top = `${termRect.top + cy * cellH}px`;
-          imeTextarea.style.opacity = "0.01";
-          imeTextarea.style.width = "1px";
-          imeTextarea.style.height = "1px";
+          imeTextarea.style.left = `${sr.left + cx * cellW}px`;
+          imeTextarea.style.top = `${sr.top + cy * cellH}px`;
         };
-        const onCompositionEnd = () => {
+
+        imeTextarea.addEventListener("compositionstart", moveToCursor);
+        imeTextarea.addEventListener("compositionend", () => {
           imeTextarea.style.position = "absolute";
-          imeTextarea.style.left = "-999px";
-          imeTextarea.style.opacity = "0";
-        };
-        imeTextarea.addEventListener("compositionstart", onCompositionStart);
-        imeTextarea.addEventListener("compositionend", onCompositionEnd);
+          imeTextarea.style.left = "-9999px";
+          imeTextarea.style.top = "-9999px";
+        });
       }
 
       try {
@@ -307,8 +301,12 @@ export function TerminalPanel({
       : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
     const count = visibleIds.length;
 
-    // Hide everything first, then show visible ones
-    for (const [, inst] of instances) {
+    // Hide non-selected instances first, then show visible ones.
+    // Skip the active/selected session so its xterm textarea doesn't lose
+    // focus (important when focus restoration depends on the element
+    // staying visible, e.g. notification-click path without user gesture).
+    for (const [sid, inst] of instances) {
+      if (sid === selectedSessionId) continue;
       inst.container.style.display = "none";
       inst.container.classList.remove("active");
     }
@@ -344,7 +342,18 @@ export function TerminalPanel({
       }
       if (selectedSessionId) {
         const inst = instances.get(selectedSessionId);
-        if (inst) inst.term.focus();
+        if (inst) {
+          inst.term.focus();
+          const retryFocus = (delay: number) =>
+            setTimeout(() => {
+              if (!inst.container.isConnected) return;
+              const ta = inst.container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
+              if (ta) { ta.focus(); inst.term.focus(); }
+              else inst.term.focus();
+            }, delay);
+          retryFocus(100);
+          retryFocus(400);
+        }
       }
     } else {
       root.className = "terminal-container";
@@ -359,7 +368,7 @@ export function TerminalPanel({
     }, 0);
   }, [groupSessions, selectedSessionId, splitMode]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyLayout();
   }, [applyLayout]);
 
@@ -379,21 +388,44 @@ export function TerminalPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupSessions.length, splitMode, selectedSessionId]);
 
-  // ── Global keyboard shortcuts for session navigation ──
+  // ── Re-focus xterm when window gains focus (e.g. Alt+Tab back) ──
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return;
-      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-        e.preventDefault();
-        setTimeout(() => switchSessionRef.current?.("prev"), 0);
-      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-        e.preventDefault();
-        setTimeout(() => switchSessionRef.current?.("next"), 0);
+    const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (!focused || !selectedSessionId) return;
+      const inst = termInstancesRef.current.get(selectedSessionId);
+      if (inst) {
+        const ta = inst.container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
+        if (ta) ta.focus();
+        else inst.term.focus();
+      }
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [selectedSessionId]);
+
+  // ── Global keyboard shortcuts (capture phase = before xterm) ──
+  useEffect(() => {
+    const onCapture = (e: KeyboardEvent) => {
+      // Skip rename/other text inputs, but NOT the xterm helper textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      const cl = (e.target as HTMLElement)?.classList;
+      const isInput = (tag === "INPUT" || tag === "TEXTAREA") && !cl?.contains("xterm-helper-textarea");
+      if (isInput) return;
+
+      // Alt+Arrow → switch sessions (prev/next in active group)
+      if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+        if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+          e.preventDefault();
+          e.stopPropagation();
+          setTimeout(() => switchSessionRef.current?.("prev"), 0);
+        } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+          e.preventDefault();
+          e.stopPropagation();
+          setTimeout(() => switchSessionRef.current?.("next"), 0);
+        }
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-    // Intentionally only bind once; refs keep callbacks current.
+    window.addEventListener("keydown", onCapture, { capture: true });
+    return () => window.removeEventListener("keydown", onCapture, { capture: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -4,7 +4,7 @@ import { TerminalPanel } from "./components/TerminalPanel";
 import { PerformancePanel } from "./components/PerformancePanel";
 import { AddWorkspaceDialog } from "./components/AddWorkspaceDialog";
 import { useWorkspaces } from "./hooks/useWorkspaces";
-import { api, onPtyTitle, onPtyExit } from "./api";
+import { api, onPtyTitle, onPtyExit, onPtyOutput } from "./api";
 import type { Workspace } from "./api";
 import { notifySession } from "./notification";
 import "./App.css";
@@ -47,12 +47,22 @@ function isSpinnerChar(ch: string): boolean {
 function inferStatus(title: string): SessionStatus {
   const trimmed = title.trim();
   const claudeIdx = trimmed.indexOf("Claude Code");
-  if (claudeIdx > 0) {
+  if (claudeIdx >= 0) {
     const prefix = trimmed[claudeIdx - 2] ?? "";
     if (isSpinnerChar(prefix)) return "thinking";
     return "idle";
   }
   return "running";
+}
+
+/** Detect Claude Code permission prompt from PTY output text */
+function isPermissionPrompt(data: string): boolean {
+  return (
+    data.includes("Allow Claude Code to") ||
+    data.includes("Claude Code needs permission") ||
+    data.includes("Claude Code needs your permission") ||
+    /Allow\s.*Claude Code/im.test(data)
+  );
 }
 
 let _sessionCounter = 0;
@@ -69,6 +79,7 @@ function App() {
     addWorkspace,
     updateWorkspace,
     deleteWorkspace,
+    reorderWorkspaces,
   } = useWorkspaces();
 
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -89,8 +100,8 @@ function App() {
   sessionsRef.current = sessions;
   const workspacesRef = useRef(workspaces);
   workspacesRef.current = workspaces;
-  // View toggle: "performance" is the default view
-  const [view, setView] = useState<"performance" | "terminal">("performance");
+  // View toggle: default to workspace/terminal view
+  const [view, setView] = useState<"performance" | "terminal">("terminal");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const toggleSidebar = useCallback(() => setSidebarCollapsed((v) => !v), []);
 
@@ -168,6 +179,45 @@ function App() {
         sessionId: session.id,
         detail: `exited with code ${payload.code}`,
       });
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  // Listen for PTY output — detect permission prompts from Claude Code
+  useEffect(() => {
+    // Debounce: at most one permission notification per session every 15 seconds
+    const lastNotify = new Map<string, number>();
+
+    const unlisten = onPtyOutput((payload) => {
+      if (!isPermissionPrompt(payload.data)) return;
+
+      const sid = payload.session_id;
+      const now = Date.now();
+      const last = lastNotify.get(sid) ?? 0;
+      if (now - last < 15_000) return;
+      lastNotify.set(sid, now);
+
+      const session = sessionsRef.current.find((s) => s.id === sid);
+      if (!session) return;
+
+      notifySession({
+        title: "⚡ Permission Required",
+        sessionName: session.name,
+        workspaceName: session.workspaceName,
+        sessionId: session.id,
+        detail: "Claude Code needs your permission to continue",
+      });
+
+      // Also mark the session as attention so the UI highlights it
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sid
+            ? { ...s, status: "attention" as const }
+            : s
+        )
+      );
     });
     return () => {
       unlisten.then((fn) => fn());
@@ -365,6 +415,27 @@ function App() {
     [updateWorkspace]
   );
 
+  const handleSwitchGroup = useCallback((groupId: string) => {
+    setActiveGroupId(groupId);
+    const group = groups.find((g) => g.id === groupId);
+    if (group && group.sessionIds.length > 0 && !group.sessionIds.includes(selectedSessionId ?? '')) {
+      setSelectedSessionId(group.sessionIds[0]);
+    }
+  }, [groups, selectedSessionId]);
+
+  const handleReorder = useCallback(
+    async (workspaceId: string, direction: "up" | "down") => {
+      const idx = workspaces.findIndex((w) => w.id === workspaceId);
+      if (idx === -1) return;
+      const target = direction === "up" ? idx - 1 : idx + 1;
+      if (target < 0 || target >= workspaces.length) return;
+      const reordered = [...workspaces];
+      [reordered[idx], reordered[target]] = [reordered[target], reordered[idx]];
+      await reorderWorkspaces(reordered.map((w) => w.id));
+    },
+    [workspaces, reorderWorkspaces]
+  );
+
   const handleGroupDeleteConfirm = useCallback(async () => {
     const groupId = confirmDeleteGroupId;
     if (!groupId) return;
@@ -455,6 +526,21 @@ function App() {
     const timer = setTimeout(() => setInfoToast(null), 4000);
     return () => clearTimeout(timer);
   }, [infoToast]);
+
+  // ---- Auto-expand workspaces that have sessions ----
+  useEffect(() => {
+    setExpandedWorkspaces((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const s of sessions) {
+        if (!next.has(s.workspaceId)) {
+          next.add(s.workspaceId);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [sessions]);
 
   if (loading) {
     return (
@@ -557,6 +643,7 @@ function App() {
               onDelete={setConfirmDeleteId}
               onAdd={() => setShowAddDialog(true)}
               onImportClaude={() => setShowImportConfirm(true)}
+              onReorder={handleReorder}
             />
             <button
               className={`sidebar-toggle${sidebarCollapsed ? " collapsed" : ""}`}
@@ -582,7 +669,7 @@ function App() {
               activeGroupId={activeGroupId}
               selectedSessionId={selectedSessionId}
               onSelectSession={handleSelectSession}
-              onSwitchGroup={setActiveGroupId}
+              onSwitchGroup={handleSwitchGroup}
               onCloseSession={handleStopSession}
               onRenameGroup={handleRenameGroup}
               onMoveSessionToGroup={handleMoveSessionToGroup}

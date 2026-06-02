@@ -89,6 +89,22 @@ pub fn delete_workspace(id: String) -> Vec<Workspace> {
     list
 }
 
+pub fn reorder_workspaces(ids: Vec<String>) -> Vec<Workspace> {
+    let all = load_all();
+    let mut ordered: Vec<Workspace> = ids
+        .iter()
+        .filter_map(|id| all.iter().find(|w| w.id == *id).cloned())
+        .collect();
+    // Append any workspaces not in the supplied ids (shouldn't happen, but be safe)
+    for w in &all {
+        if !ordered.iter().any(|o| o.id == w.id) {
+            ordered.push(w.clone());
+        }
+    }
+    save_all(&ordered);
+    ordered
+}
+
 // ── Import from Claude Code ──
 
 fn claude_projects_dir() -> PathBuf {

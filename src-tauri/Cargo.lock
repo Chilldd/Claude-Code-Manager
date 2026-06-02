@@ -5357,6 +5357,7 @@ name = "yug-cc-manager"
 version = "0.1.0"
 dependencies = [
  "portable-pty",
+ "raw-window-handle",
  "serde",
  "serde_json",
  "sysinfo",

@@ -187,7 +187,7 @@
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   animation: slideInLeft 0.35s var(--ease-out-expo);
   transition: width 0.25s var(--ease-out-expo), min-width 0.25s var(--ease-out-expo), opacity 0.2s var(--ease-smooth), border-color 0.25s var(--ease-out-expo);
 }
@@ -225,8 +225,8 @@
 }
 
 .workspace-header-btn {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -236,7 +236,7 @@
   align-items: center;
   justify-content: center;
   transition: all 0.15s var(--ease-smooth);
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1;
 }
 
@@ -294,6 +294,12 @@
 .workspace-group {
   border-radius: var(--radius-md);
   animation: slideInUp 0.25s var(--ease-out-expo) both;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 0;
+}
+.workspace-group:has(.workspace-menu) {
+  z-index: 2;
 }
 
 .workspace-group[data-animation-index="0"] { animation-delay: 0s; }
@@ -431,6 +437,11 @@
   opacity: 1;
 }
 
+/* Keep actions visible while menu is open */
+.workspace-actions:has(.workspace-menu) {
+  opacity: 1;
+}
+
 .workspace-actions button {
   width: 28px;
   height: 28px;
@@ -499,6 +510,73 @@
 .btn-edit:hover { color: var(--warning); }
 .btn-delete:hover { color: var(--danger); }
 
+/* ── More actions (⋯) menu ── */
+.btn-more {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+.btn-more:hover { color: var(--text-primary); }
+
+.workspace-menu-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.workspace-menu-wrapper .workspace-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 1000;
+  min-width: 140px;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: fadeIn 0.1s var(--ease-smooth);
+}
+
+.workspace-menu button {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s var(--ease-smooth);
+}
+
+.workspace-menu button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.workspace-menu button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.workspace-menu button.danger:hover {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
+.workspace-menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 6px;
+}
+
 /* ── Session List (expanded) ── */
 .session-list {
   margin: 2px 0 4px 22px;
@@ -507,6 +585,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  overflow: hidden;
 }
 
 .session-empty {
