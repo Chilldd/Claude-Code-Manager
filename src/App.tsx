@@ -674,6 +674,7 @@ function App() {
               onRenameGroup={handleRenameGroup}
               onMoveSessionToGroup={handleMoveSessionToGroup}
               onAddGroup={() => {
+                setSelectedSessionId(null);
                 setGroups((prev) => {
                   const { id, name } = nextGroupInfo(prev);
                   const newGroup: SessionGroup = { id, name, sessionIds: [] };

@@ -355,6 +355,11 @@ export function TerminalPanel({
         }
       }
     } else {
+      // Active group is empty — hide all terminal instances
+      for (const [, inst] of instances) {
+        inst.container.style.display = "none";
+        inst.container.classList.remove("active");
+      }
       root.className = "terminal-container";
       root.style.display = "";
       root.style.gridTemplateColumns = "";
@@ -541,7 +546,26 @@ export function TerminalPanel({
           </div>
         </>
       )}
-      <div className="terminal-container" ref={containerRootRef} />
+      <div style={{ flex: 1, position: 'relative', display: 'flex', minHeight: 0 }}>
+        <div className="terminal-container" ref={containerRootRef} />
+        {activeGroupSessions.length === 0 && (
+          <div className="terminal-placeholder">
+            <span className="terminal-placeholder-icon">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <rect x="6" y="6" width="20" height="20" rx="3" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="16" x2="20" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <line x1="16" y1="12" x2="16" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <p>
+              此组暂无会话，请从工作区启动新会话
+            </p>
+            <span className="terminal-placeholder-hint">
+              This group is empty. Launch a session from the sidebar.
+            </span>
+          </div>
+        )}
+      </div>
       {!hasSessions && (
         <div className="terminal-placeholder">
           <span className="terminal-placeholder-icon">
