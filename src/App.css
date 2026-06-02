@@ -189,6 +189,17 @@
   flex-direction: column;
   overflow: hidden;
   animation: slideInLeft 0.35s var(--ease-out-expo);
+  transition: width 0.25s var(--ease-out-expo), min-width 0.25s var(--ease-out-expo), opacity 0.2s var(--ease-smooth), border-color 0.25s var(--ease-out-expo);
+}
+
+.workspace-panel.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  overflow: hidden;
+  opacity: 0;
+  border-right-color: transparent;
+  padding: 0;
 }
 
 .workspace-header {
@@ -210,12 +221,12 @@
 
 .workspace-header-actions {
   display: flex;
-  gap: 2px;
+  gap: 4px;
 }
 
 .workspace-header-btn {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -225,7 +236,7 @@
   align-items: center;
   justify-content: center;
   transition: all 0.15s var(--ease-smooth);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
 }
 
@@ -249,6 +260,23 @@
   gap: 1px;
 }
 
+.workspace-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.workspace-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.workspace-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.workspace-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
+
 .empty-hint {
   color: var(--text-muted);
   text-align: center;
@@ -265,25 +293,38 @@
 /* ── Workspace Group ── */
 .workspace-group {
   border-radius: var(--radius-md);
-  overflow: hidden;
   animation: slideInUp 0.25s var(--ease-out-expo) both;
 }
 
-.workspace-group:nth-child(1) { animation-delay: 0.02s; }
-.workspace-group:nth-child(2) { animation-delay: 0.04s; }
-.workspace-group:nth-child(3) { animation-delay: 0.06s; }
-.workspace-group:nth-child(4) { animation-delay: 0.08s; }
-.workspace-group:nth-child(5) { animation-delay: 0.10s; }
-.workspace-group:nth-child(6) { animation-delay: 0.12s; }
-.workspace-group:nth-child(7) { animation-delay: 0.14s; }
-.workspace-group:nth-child(8) { animation-delay: 0.16s; }
+.workspace-group[data-animation-index="0"] { animation-delay: 0s; }
+.workspace-group[data-animation-index="1"] { animation-delay: 0.015s; }
+.workspace-group[data-animation-index="2"] { animation-delay: 0.03s; }
+.workspace-group[data-animation-index="3"] { animation-delay: 0.045s; }
+.workspace-group[data-animation-index="4"] { animation-delay: 0.06s; }
+.workspace-group[data-animation-index="5"] { animation-delay: 0.075s; }
+.workspace-group[data-animation-index="6"] { animation-delay: 0.09s; }
+.workspace-group[data-animation-index="7"] { animation-delay: 0.105s; }
+.workspace-group[data-animation-index="8"] { animation-delay: 0.12s; }
+.workspace-group[data-animation-index="9"] { animation-delay: 0.135s; }
+.workspace-group[data-animation-index="10"] { animation-delay: 0.15s; }
+.workspace-group[data-animation-index="11"] { animation-delay: 0.16s; }
+.workspace-group[data-animation-index="12"] { animation-delay: 0.17s; }
+.workspace-group[data-animation-index="13"] { animation-delay: 0.18s; }
+.workspace-group[data-animation-index="14"] { animation-delay: 0.19s; }
+.workspace-group[data-animation-index="15"] { animation-delay: 0.20s; }
+.workspace-group[data-animation-index="16"] { animation-delay: 0.21s; }
+.workspace-group[data-animation-index="17"] { animation-delay: 0.22s; }
+.workspace-group[data-animation-index="18"] { animation-delay: 0.23s; }
+.workspace-group[data-animation-index="19"] { animation-delay: 0.24s; }
+.workspace-group[data-animation-index="20"] { animation-delay: 0.25s; }
+.workspace-group[data-animation-index="20+"] { animation-delay: 0.25s; }
 
 /* ── Workspace Item ── */
 .workspace-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 8px;
+  gap: 4px;
+  padding: 6px 6px;
   border-radius: var(--radius-md);
   cursor: default;
   transition: background 0.15s var(--ease-smooth);
@@ -312,13 +353,13 @@
 
 /* ── Expand Button ── */
 .workspace-expand-btn {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 11px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -336,11 +377,12 @@
 .workspace-info {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   min-width: 0;
   flex: 1;
   cursor: pointer;
   padding: 0 2px;
+  overflow: hidden;
 }
 
 .workspace-name {
@@ -381,8 +423,8 @@
   display: flex;
   gap: 2px;
   flex-shrink: 0;
-  opacity: 0.35;
-  transition: opacity 0.15s var(--ease-smooth);
+  opacity: 0;
+  transition: opacity 0.1s var(--ease-smooth);
 }
 
 .workspace-item:hover .workspace-actions {
@@ -390,18 +432,18 @@
 }
 
 .workspace-actions button {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s var(--ease-smooth);
+  transition: all 0.1s var(--ease-smooth);
 }
 
 .workspace-actions button:hover {
@@ -409,18 +451,43 @@
   color: var(--text-primary);
 }
 
+/* ── Sidebar Collapse Toggle ── */
+.sidebar-toggle {
+  width: 18px;
+  min-width: 18px;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s var(--ease-out-expo);
+  flex-shrink: 0;
+  z-index: 10;
+  padding: 0;
+}
+
+.sidebar-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .btn-new-session {
-  padding: 1px 7px;
+  padding: 2px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
   font-family: var(--font-mono);
   cursor: pointer;
   transition: all 0.15s var(--ease-smooth);
   white-space: nowrap;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .btn-new-session:hover {
@@ -522,13 +589,13 @@
 }
 
 .session-stop {
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   border: none;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-dim);
-  font-size: 8px;
+  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1123,6 +1190,12 @@
   background: rgba(60, 50, 20, 0.92);
   border: 1px solid rgba(215, 186, 125, 0.3);
   color: var(--warning);
+}
+
+.app-toast.info {
+  background: rgba(20, 40, 60, 0.92);
+  border: 1px solid rgba(96, 205, 255, 0.3);
+  color: var(--accent);
 }
 
 .app-toast button {

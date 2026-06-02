@@ -72,6 +72,7 @@ function App() {
   } = useWorkspaces();
 
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<string | null>(null);
@@ -79,6 +80,7 @@ function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(new Set());
   const [ptyError, setPtyError] = useState<string | null>(null);
+  const [infoToast, setInfoToast] = useState<string | null>(null);
   const [groups, setGroups] = useState<SessionGroup[]>([
     { id: 'g1', name: 'Group 1', sessionIds: [] },
   ]);
@@ -89,6 +91,8 @@ function App() {
   workspacesRef.current = workspaces;
   // View toggle: "performance" is the default view
   const [view, setView] = useState<"performance" | "terminal">("performance");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const toggleSidebar = useCallback(() => setSidebarCollapsed((v) => !v), []);
 
   // Active group's session IDs
   const activeGroupSessionIds = useMemo(() => {
@@ -418,6 +422,40 @@ function App() {
     [addWorkspace]
   );
 
+  const handleImportClaude = useCallback(async () => {
+    try {
+      const discovered = await api.importFromClaudeCode();
+      if (discovered.length === 0) {
+        setInfoToast("All Claude Code projects have already been imported.");
+        return;
+      }
+      let imported = 0;
+      for (const ws of discovered) {
+        const ok = await addWorkspace({
+          name: ws.name,
+          path: ws.path,
+          command: ws.command,
+          args: ws.args,
+          auto_prompt: ws.auto_prompt,
+          env: ws.env,
+        });
+        if (ok) imported++;
+      }
+      if (imported > 0) {
+        setInfoToast(`Imported ${imported} workspace${imported > 1 ? 's' : ''} from Claude Code.`);
+      }
+    } catch (e) {
+      setPtyError(`Import failed: ${String(e)}`);
+    }
+  }, [addWorkspace]);
+
+  // ---- Auto-dismiss infoToast ----
+  useEffect(() => {
+    if (!infoToast) return;
+    const timer = setTimeout(() => setInfoToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [infoToast]);
+
   if (loading) {
     return (
       <div className="app-loading">
@@ -506,6 +544,7 @@ function App() {
         {view === "terminal" ? (
           <>
             <WorkspacePanel
+              collapsed={sidebarCollapsed}
               workspaces={workspaces}
               sessions={sessions}
               selectedSessionId={selectedSessionId}
@@ -517,7 +556,21 @@ function App() {
               onEdit={setEditingWorkspace}
               onDelete={setConfirmDeleteId}
               onAdd={() => setShowAddDialog(true)}
+              onImportClaude={() => setShowImportConfirm(true)}
             />
+            <button
+              className={`sidebar-toggle${sidebarCollapsed ? " collapsed" : ""}`}
+              onClick={toggleSidebar}
+              title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                {sidebarCollapsed ? (
+                  <polyline points="3,2 7,5 3,8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                ) : (
+                  <polyline points="7,2 3,5 7,8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+              </svg>
+            </button>
             <TerminalPanel
               sessions={sessions}
               groupSessions={activeGroupSessions}
@@ -560,6 +613,13 @@ function App() {
         <div className="app-toast error">
           <span>PTY Error: {ptyError}</span>
           <button onClick={() => setPtyError(null)}>Dismiss</button>
+        </div>
+      )}
+
+      {infoToast && (
+        <div className="app-toast info">
+          <span>{infoToast}</span>
+          <button onClick={() => setInfoToast(null)}>Dismiss</button>
         </div>
       )}
 
@@ -608,6 +668,27 @@ function App() {
             <div className="dialog-actions">
               <button className="btn-secondary" onClick={() => setConfirmDeleteGroupId(null)}>Cancel</button>
               <button className="btn-danger" onClick={handleGroupDeleteConfirm}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showImportConfirm && (
+        <div className="dialog-overlay" onClick={() => setShowImportConfirm(false)}>
+          <div className="dialog dialog-confirm" onClick={(e) => e.stopPropagation()}>
+            <h2>Import from Claude Code</h2>
+            <p className="confirm-text">
+              This will scan your Claude Code projects directory
+              (<code>~/.claude/projects/</code>) and import any workspaces not
+              already in your list. Each workspace will be configured with
+              default settings (command: <code>claude</code>).
+            </p>
+            <div className="dialog-actions">
+              <button className="btn-secondary" onClick={() => setShowImportConfirm(false)}>Cancel</button>
+              <button className="btn-primary" onClick={() => {
+                setShowImportConfirm(false);
+                handleImportClaude();
+              }}>Import</button>
             </div>
           </div>
         </div>

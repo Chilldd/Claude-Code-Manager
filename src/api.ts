@@ -106,6 +106,10 @@ export const api = {
   /** Send a native notification with click-to-activate. Click opens the app via deep-link protocol. */
   sendSessionNotification: (sessionId: string, title: string, body: string) =>
     invoke<void>("send_session_notification", { sessionId, title, body }),
+
+  /** Import workspaces from Claude Code's project directory (~/.claude/projects/) */
+  importFromClaudeCode: () =>
+    invoke<Workspace[]>("import_from_claude_code"),
 };
 
 // ── Event listeners (event-driven, replaces polling) ──

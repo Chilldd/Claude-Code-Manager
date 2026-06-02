@@ -116,6 +116,19 @@ export function TerminalPanel({
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
   const dragSessionIdRef = useRef<string | null>(null);
 
+  // ── Session navigation via Ctrl+Arrow / Ctrl+Tab ──
+  const switchSessionRef = useRef<((dir: "prev" | "next") => void) | null>(null);
+  switchSessionRef.current = (dir) => {
+    const ids = groupSessions.map((s) => s.id);
+    if (ids.length === 0 || !selectedSessionId) return;
+    const idx = ids.indexOf(selectedSessionId);
+    if (idx === -1) return;
+    const nextIdx = dir === "next"
+      ? (idx + 1) % ids.length
+      : (idx - 1 + ids.length) % ids.length;
+    onSelectSession(ids[nextIdx]);
+  };
+
   // ── PTY event listeners (set up once on mount) ──
   useEffect(() => {
     const unlistenOut = onPtyOutput((payload: PtyOutputEvent) => {
@@ -188,9 +201,69 @@ export function TerminalPanel({
         letterSpacing: 0,
       });
 
+      // Make Ctrl+V paste directly (like a native terminal), instead of
+      // the default xterm Ctrl+Shift+V behavior.
+      term.attachCustomKeyEventHandler((e) => {
+        if (e.type === "keydown" && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === "v") {
+          e.preventDefault();
+          navigator.clipboard.readText()
+            .then((text) => {
+              api.writePty(session.id, text).catch(() => {});
+            })
+            .catch(() => {});
+          return false;
+        }
+        if (e.type === "keydown" && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.key === "V") {
+          // Ctrl+Shift+V still works via xterm default handling
+          return true;
+        }
+        if (e.type === "keydown" && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === "Enter") {
+          // Ctrl+Enter → send \n instead of the default \r,
+          // so Claude Code treats it as a newline in the prompt.
+          api.writePty(session.id, "\n").catch(() => {});
+          return false;
+        }
+        // Ctrl+Arrow → switch sessions (prev/next in active group)
+        // All four arrows work: ←/↑ → prev, →/↓ → next (matches 2×2 grid intuition)
+        if (e.type === "keydown" && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+          if (e.key === "ArrowLeft" || e.key === "ArrowUp") { setTimeout(() => switchSessionRef.current?.("prev"), 0); return false; }
+          if (e.key === "ArrowRight" || e.key === "ArrowDown") { setTimeout(() => switchSessionRef.current?.("next"), 0); return false; }
+        }
+        return true;
+      });
+
       const fitAddon = new FitAddon();
       term.loadAddon(fitAddon);
       term.open(container);
+
+      // Fix IME composition window position: by default xterm hides its
+      // helper textarea off-screen, causing the native IME candidate
+      // window to appear at a random position.  During composition we
+      // move the textarea to follow the terminal cursor.
+      const imeTextarea = container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
+      if (imeTextarea) {
+        const onCompositionStart = () => {
+          const termRect = term.element?.getBoundingClientRect();
+          if (!termRect) return;
+          const cellW = termRect.width / term.cols;
+          const cellH = termRect.height / term.rows;
+          const cx = term.buffer.active.cursorX;
+          const cy = term.buffer.active.cursorY;
+          imeTextarea.style.position = "fixed";
+          imeTextarea.style.left = `${termRect.left + cx * cellW}px`;
+          imeTextarea.style.top = `${termRect.top + cy * cellH}px`;
+          imeTextarea.style.opacity = "0.01";
+          imeTextarea.style.width = "1px";
+          imeTextarea.style.height = "1px";
+        };
+        const onCompositionEnd = () => {
+          imeTextarea.style.position = "absolute";
+          imeTextarea.style.left = "-999px";
+          imeTextarea.style.opacity = "0";
+        };
+        imeTextarea.addEventListener("compositionstart", onCompositionStart);
+        imeTextarea.addEventListener("compositionend", onCompositionEnd);
+      }
 
       try {
         fitAddon.fit();
@@ -305,6 +378,24 @@ export function TerminalPanel({
     return () => window.removeEventListener("resize", onResize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupSessions.length, splitMode, selectedSessionId]);
+
+  // ── Global keyboard shortcuts for session navigation ──
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return;
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setTimeout(() => switchSessionRef.current?.("prev"), 0);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setTimeout(() => switchSessionRef.current?.("next"), 0);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // Intentionally only bind once; refs keep callbacks current.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Render ──
   const hasSessions = sessions.length > 0;

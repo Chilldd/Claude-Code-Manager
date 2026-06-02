@@ -151,6 +151,11 @@ fn delete_workspace(id: String) -> Vec<workspace::Workspace> {
 }
 
 #[tauri::command]
+fn import_from_claude_code() -> Vec<workspace::Workspace> {
+    workspace::import_from_claude_code()
+}
+
+#[tauri::command]
 fn create_pty(
     window: WebviewWindow,
     state: tauri::State<'_, AppState>,
@@ -305,6 +310,7 @@ fn main() {
             add_workspace,
             update_workspace,
             delete_workspace,
+            import_from_claude_code,
             create_pty,
             write_pty,
             resize_pty,

@@ -2,6 +2,7 @@ import type { Workspace } from "../api";
 import type { SessionInfo } from "../App";
 
 interface Props {
+  collapsed?: boolean;
   workspaces: Workspace[];
   sessions: SessionInfo[];
   selectedSessionId: string | null;
@@ -13,9 +14,11 @@ interface Props {
   onEdit: (ws: Workspace) => void;
   onDelete: (workspaceId: string) => void;
   onAdd: () => void;
+  onImportClaude?: () => void;
 }
 
 export function WorkspacePanel({
+  collapsed = false,
   workspaces,
   sessions,
   selectedSessionId,
@@ -27,12 +30,22 @@ export function WorkspacePanel({
   onEdit,
   onDelete,
   onAdd,
+  onImportClaude,
 }: Props) {
   return (
-    <div className="workspace-panel">
+    <div className={`workspace-panel${collapsed ? " collapsed" : ""}`}>
       <div className="workspace-header">
         <h1>Workspaces</h1>
         <div className="workspace-header-actions">
+          {onImportClaude && (
+            <button
+              className="workspace-header-btn"
+              onClick={onImportClaude}
+              title="Import workspaces from Claude Code"
+            >
+              CC
+            </button>
+          )}
           <button
             className="workspace-header-btn primary"
             onClick={onAdd}
@@ -50,11 +63,11 @@ export function WorkspacePanel({
             Click <strong>+</strong> to add one.
           </p>
         ) : (
-          workspaces.map((ws) => {
+          workspaces.map((ws, idx) => {
             const isExpanded = expandedWorkspaces.has(ws.id);
             const wsSessions = sessions.filter((s) => s.workspaceId === ws.id);
             return (
-              <div key={ws.id} className="workspace-group">
+              <div key={ws.id} className="workspace-group" data-animation-index={idx > 20 ? "20+" : idx}>
                 {/* Workspace header row */}
                 <div className="workspace-item">
                   <button
