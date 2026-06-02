@@ -398,19 +398,27 @@ export function TerminalPanel({
     applyLayout();
   }, [applyLayout]);
 
-  // ── Refit on window resize ──
+  // ── Refit on container resize (sidebar collapse/expand, window resize, etc.) ──
   useEffect(() => {
-    const onResize = () => {
-      const allIds = groupSessions.map((s) => s.id);
-      const ids = splitMode
-        ? allIds
-        : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
-      setTimeout(() => {
+    const root = containerRootRef.current;
+    if (!root) return;
+
+    let debounceId: ReturnType<typeof setTimeout>;
+    const observer = new ResizeObserver(() => {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(() => {
+        const allIds = groupSessions.map((s) => s.id);
+        const ids = splitMode
+          ? allIds
+          : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
         refitVisible(ids, termInstancesRef.current);
-      }, 0);
+      }, 300);
+    });
+    observer.observe(root);
+    return () => {
+      observer.disconnect();
+      clearTimeout(debounceId);
     };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupSessions.length, splitMode, selectedSessionId]);
 
@@ -570,7 +578,7 @@ export function TerminalPanel({
       )}
       <div style={{ flex: 1, position: 'relative', display: 'flex', minHeight: 0 }}>
         <div className="terminal-container" ref={containerRootRef} />
-        {activeGroupSessions.length === 0 && (
+        {hasSessions && activeGroupSessions.length === 0 && (
           <div className="terminal-placeholder">
             <span className="terminal-placeholder-icon">
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
