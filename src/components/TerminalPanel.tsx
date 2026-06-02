@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useCallback, useState } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onPtyOutput, onPtyExit } from "../api";
 import type { PtyOutputEvent, PtyExitEvent } from "../api";
 import type { SessionInfo } from "../App";
@@ -387,20 +386,6 @@ export function TerminalPanel({
     return () => window.removeEventListener("resize", onResize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupSessions.length, splitMode, selectedSessionId]);
-
-  // ── Re-focus xterm when window gains focus (e.g. Alt+Tab back) ──
-  useEffect(() => {
-    const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-      if (!focused || !selectedSessionId) return;
-      const inst = termInstancesRef.current.get(selectedSessionId);
-      if (inst) {
-        const ta = inst.container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
-        if (ta) ta.focus();
-        else inst.term.focus();
-      }
-    });
-    return () => { unlisten.then((fn) => fn()); };
-  }, [selectedSessionId]);
 
   // ── Global keyboard shortcuts (capture phase = before xterm) ──
   useEffect(() => {

@@ -29,7 +29,6 @@ windows = { version = "0.61", features = [
   "Win32_System_ProcessStatus",
   "Win32_System_Console",
   "Win32_UI_WindowsAndMessaging",
-  "Win32_UI_Input_KeyboardAndMouse",
 ] }
 sysinfo = "0.31"
 raw-window-handle = "0.6"

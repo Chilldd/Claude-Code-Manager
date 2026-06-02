@@ -153,46 +153,6 @@ fn handle_deep_link(app: &tauri::AppHandle, session_id: &str) {
             }
         }
         let _ = window.set_focus();
-
-        // ── Focus xterm with user activation ──
-        // The browser blocks element.focus() without a user gesture, and the
-        // notification-click path has no JS user activation.  We inject a
-        // real Windows input event via SendInput (OS-level, treated as user
-        // input by the browser), then capture it in a one-shot keydown
-        // listener that runs WITH user activation and focuses the textarea.
-        let sid = session_id.replace('\\', "\\\\").replace('\'', "\\'");
-        let js = format!(
-            r#"(function(){{
-                var sid = '{0}';
-                var handler = function(){{
-                    window.removeEventListener('keydown', handler, true);
-                    var poll = function(){{
-                        var el = document.querySelector('[data-sid="'+sid+'"]');
-                        if(el){{ var ta = el.querySelector('.xterm-helper-textarea'); if(ta){{ ta.focus(); return; }} }}
-                        setTimeout(poll, 20);
-                    }};
-                    poll();
-                }};
-                window.addEventListener('keydown', handler, true);
-            }})()"#,
-            sid
-        );
-        let _ = window.eval(&js);
-
-        // Inject a virtual key-press via SendInput to trigger the listener
-        // above with transient user activation in the browser.
-        #[cfg(target_os = "windows")]
-        unsafe {
-            use windows::Win32::UI::Input::KeyboardAndMouse::{
-                SendInput, INPUT, INPUT_KEYBOARD, KEYEVENTF_KEYUP,
-            };
-            let mut inputs = [INPUT::default(); 2];
-            // VK_F24 (0x87) — an unmapped key with zero side effects
-            inputs[0].r#type = INPUT_KEYBOARD;
-            inputs[0].Anonymous.ki.wVk = windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(0x87);
-            inputs[0].Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
-            let _ = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-        }
     }
 }
 
