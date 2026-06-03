@@ -246,6 +246,18 @@ export function TerminalPanel({
       term.loadAddon(fitAddon);
       term.open(container);
 
+      // Suppress IME composition intermediate data from reaching the PTY.
+      // When typing Chinese (pinyin → candidate → commit), the intermediate
+      // letters can leak to the terminal before compositionstart fires.
+      // We intercept onData during composition and only let the final
+      // committed text through after compositionend.
+      let isComposing = false;
+      const imeTextarea = container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
+      if (imeTextarea) {
+        imeTextarea.addEventListener("compositionstart", () => { isComposing = true; });
+        imeTextarea.addEventListener("compositionend", () => { isComposing = false; });
+      }
+
       try {
         fitAddon.fit();
         const dims = fitAddon.proposeDimensions();
@@ -259,6 +271,7 @@ export function TerminalPanel({
       });
 
       term.onData((data) => {
+        if (isComposing) return; // suppress intermediate IME data
         api.writePty(session.id, data).catch(() => {
           term.write(data);
         });
