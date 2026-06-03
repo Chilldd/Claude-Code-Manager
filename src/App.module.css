@@ -40,19 +40,20 @@
   position: absolute;
   left: 280px;
   top: 50%;
-  transform: translateY(-50%) translateX(0);
+  transform: translateY(-50%);
   z-index: 50;
-  width: 18px;
-  height: 52px;
-  border: none;
-  border-radius: 0 4px 4px 0;
+  width: 22px;
+  height: 56px;
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   background: var(--bg-surface);
   color: var(--text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.25s var(--ease-out-expo), background 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth);
+  transition: left 0.25s var(--ease-out-expo), background 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth);
 }
 
 .sidebarToggle:hover {
@@ -61,5 +62,5 @@
 }
 
 .sidebarToggle.collapsed {
-  transform: translateY(-50%) translateX(-280px);
+  left: 0;
 }
