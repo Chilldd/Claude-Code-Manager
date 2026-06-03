@@ -24,21 +24,21 @@ export function Toast({
       {error && (
         <div className={`${styles.toast} ${styles.error}`}>
           <span>{error}</span>
-          <button onClick={onRetry}>Retry</button>
+          <button onClick={onRetry}>重试</button>
         </div>
       )}
 
       {ptyError && (
         <div className={`${styles.toast} ${styles.error}`}>
-          <span>PTY Error: {ptyError}</span>
-          <button onClick={onDismissPtyError}>Dismiss</button>
+          <span>PTY 错误：{ptyError}</span>
+          <button onClick={onDismissPtyError}>关闭</button>
         </div>
       )}
 
       {infoToast && (
         <div className={`${styles.toast} ${styles.info}`}>
           <span>{infoToast}</span>
-          <button onClick={onDismissInfo}>Dismiss</button>
+          <button onClick={onDismissInfo}>关闭</button>
         </div>
       )}
     </>

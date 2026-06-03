@@ -90,7 +90,7 @@ export function GroupTabs({
           <button
             className={styles.groupTabClose}
             onClick={(e) => { e.stopPropagation(); onDeleteGroup(g.id); }}
-            title="Delete group"
+            title="删除分组"
           >
             <svg width="7" height="7" viewBox="0 0 7 7">
               <line x1="1" y1="1" x2="6" y2="6" stroke="currentColor" strokeWidth="1.2" />
@@ -99,7 +99,7 @@ export function GroupTabs({
           </button>
         </div>
       ))}
-      <button className={styles.groupAddBtn} onClick={onAddGroup} title="New group">+</button>
+      <button className={styles.groupAddBtn} onClick={onAddGroup} title="新建分组">+</button>
     </div>
   );
 }

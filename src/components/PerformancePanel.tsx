@@ -204,9 +204,9 @@ export function PerformancePanel({ sessions }: Props) {
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
-        <h2>⚡ Performance</h2>
+        <h2>⚡ 性能</h2>
         <span className={styles.subtitle}>
-          Event-driven · Process Graph · Session State Machine
+          事件驱动 · 进程树 · 会话状态机
         </span>
       </div>
 
@@ -248,7 +248,7 @@ export function PerformancePanel({ sessions }: Props) {
           <div className={styles.barTrack}>
             <div className={`${styles.barFill} ${styles.memory}`} style={{ width: sysStats ? `${Math.min(sysStats.memory_percent, 100)}%` : "0%" }} />
           </div>
-          <span className={styles.barLabel}>{sysStats ? `${sysStats.memory_percent.toFixed(1)}% used` : ""}</span>
+          <span className={styles.barLabel}>{sysStats ? `${sysStats.memory_percent.toFixed(1)}% 已用` : ""}</span>
         </div>
 
         {/* Sessions */}
@@ -260,13 +260,13 @@ export function PerformancePanel({ sessions }: Props) {
                 <rect x="10.5" y="10.5" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
               </svg>
             </span>
-            <span className={styles.cardTitle}>Sessions</span>
+            <span className={styles.cardTitle}>会话数</span>
           </div>
           <div className={styles.cardValue} data-color="yellow">
             {sessions.length}
           </div>
           <div className={styles.cardSub}>
-            {activeCount} active · {agg.totalCount} processes
+            {activeCount} 个活跃 · {agg.totalCount} 个进程
           </div>
         </div>
 
@@ -278,13 +278,13 @@ export function PerformancePanel({ sessions }: Props) {
                 <polyline points="2,14 7,9 10,12 16,5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </span>
-            <span className={styles.cardTitle}>Terminal Resources</span>
+            <span className={styles.cardTitle}>终端资源</span>
           </div>
           <div className={styles.cardValue} data-color="accent" style={{ fontSize: "20px" }}>
             {agg.totalCpu.toFixed(1)}% CPU
           </div>
           <div className={styles.cardSub}>
-            {agg.totalMemMb.toFixed(1)} MB memory · {agg.totalCount} tracked PIDs
+            {agg.totalMemMb.toFixed(1)} MB 内存 · {agg.totalCount} 个 PID
           </div>
         </div>
       </div>
@@ -297,12 +297,12 @@ export function PerformancePanel({ sessions }: Props) {
         >
           <span className={styles.collapseIcon}>{showProcessTree ? "▼" : "▶"}</span>
           <h3 className={styles.sectionTitle}>
-            Process Graph
+            进程图
             <span className={styles.sectionBadge}>
-              {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+              {sessions.length} 个会话
             </span>
             <span className={`${styles.sectionBadge} ${styles.dim}`}>
-              {agg.totalCount} processes
+              {agg.totalCount} 个进程
             </span>
           </h3>
         </div>
@@ -311,7 +311,7 @@ export function PerformancePanel({ sessions }: Props) {
           <div className={styles.sessionTreeList}>
             {sessions.length === 0 ? (
               <div className={styles.empty}>
-                <p>No active sessions. Launch a workspace to see the process tree.</p>
+                <p>暂无活跃会话。启动工作区后可查看进程树。</p>
               </div>
             ) : (
               sessions.map((session) => {
@@ -338,7 +338,7 @@ export function PerformancePanel({ sessions }: Props) {
                       </span>
                       <span className={`${styles.statePill} ${styles[state as keyof typeof styles] || ''}`}>{state}</span>
                       <span className={styles.sessionTreeSummary}>
-                        {sessCount} proc · {sessCpu.toFixed(1)}% CPU ·{" "}
+                        {sessCount} 个进程 · {sessCpu.toFixed(1)}% CPU ·{" "}
                         {sessMem > 100 * 1024 * 1024
                           ? `${(sessMem / (1024 * 1024 * 1024)).toFixed(2)} GB`
                           : `${(sessMem / (1024 * 1024)).toFixed(1)} MB`}
@@ -350,11 +350,11 @@ export function PerformancePanel({ sessions }: Props) {
                         <table className={styles.table}>
                           <thead>
                             <tr>
-                              <th>Process Tree</th>
+                              <th>进程树</th>
                               <th>PID</th>
                               <th className={styles.perfNum}>CPU%</th>
-                              <th className={styles.perfNum}>Memory</th>
-                              <th>State</th>
+                              <th className={styles.perfNum}>内存</th>
+                              <th>状态</th>
                             </tr>
                           </thead>
                           <tbody>

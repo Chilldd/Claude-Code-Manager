@@ -30,21 +30,21 @@ export function AddWorkspaceDialog({ workspace, onSave, onCancel }: Props) {
   return (
     <div className="dialog-overlay" onClick={onCancel}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <h2>{workspace ? "Edit Workspace" : "Add Workspace"}</h2>
+        <h2>{workspace ? "编辑工作区" : "添加工作区"}</h2>
         <form onSubmit={handleSubmit}>
           <label>
-            Name
+            名称
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="My Project"
+              placeholder="我的项目"
               autoFocus
               required
             />
           </label>
           <label>
-            Path
+            路径
             <input
               type="text"
               value={path}
@@ -54,7 +54,7 @@ export function AddWorkspaceDialog({ workspace, onSave, onCancel }: Props) {
             />
           </label>
           <label>
-            Command
+            命令
             <input
               type="text"
               value={command}
@@ -63,7 +63,7 @@ export function AddWorkspaceDialog({ workspace, onSave, onCancel }: Props) {
             />
           </label>
           <label>
-            Args
+            参数
             <input
               type="text"
               value={args}
@@ -72,20 +72,20 @@ export function AddWorkspaceDialog({ workspace, onSave, onCancel }: Props) {
             />
           </label>
           <label>
-            Auto Prompt
+            自动提示
             <textarea
               value={autoPrompt}
               onChange={(e) => setAutoPrompt(e.target.value)}
-              placeholder="Optional: auto-send prompt on launch"
+              placeholder="可选：启动时自动发送提示"
               rows={3}
             />
           </label>
           <div className="dialog-actions">
             <button type="button" className="btn-secondary" onClick={onCancel}>
-              Cancel
+              取消
             </button>
             <button type="submit" className="btn-primary">
-              {workspace ? "Save" : "Add"}
+              {workspace ? "保存" : "添加"}
             </button>
           </div>
         </form>

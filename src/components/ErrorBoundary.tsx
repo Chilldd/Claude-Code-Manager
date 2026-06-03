@@ -62,7 +62,7 @@ export class ErrorBoundary extends Component<Props, State> {
               {this.props.name}
             </div>
           )}
-          <div>Something went wrong</div>
+          <div>出现错误</div>
           {this.state.error && (
             <div style={{
               fontSize: "12px",
@@ -90,7 +90,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 fontSize: "13px",
               }}
             >
-              Retry
+              重试
             </button>
             <button
               onClick={this.handleReload}
@@ -106,7 +106,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 fontWeight: 600,
               }}
             >
-              Reload
+              重新加载
             </button>
           </div>
         </div>

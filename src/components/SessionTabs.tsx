@@ -29,7 +29,7 @@ export function SessionTabs({
         <button
           className={cn(styles.splitToggle, splitMode && styles.active)}
           onClick={onToggleSplitMode}
-          title={splitMode ? "Single view" : "Split view"}
+          title={splitMode ? "单屏模式" : "分屏模式"}
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             {splitMode ? (
@@ -64,7 +64,7 @@ export function SessionTabs({
               e.stopPropagation();
               onCloseSession(session.id);
             }}
-            title="Close"
+            title="关闭会话"
           >
             <svg width="8" height="8" viewBox="0 0 8 8">
               <line x1="1.5" y1="1.5" x2="6.5" y2="6.5" stroke="currentColor" strokeWidth="1.2" />

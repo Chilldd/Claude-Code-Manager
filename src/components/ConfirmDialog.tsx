@@ -14,7 +14,7 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Confirm",
+  confirmLabel = "确认",
   confirmClass = "btn-primary",
   onConfirm,
   onCancel,
@@ -27,7 +27,7 @@ export function ConfirmDialog({
         <h2>{title}</h2>
         <p className="confirm-text">{message}</p>
         <div className="dialog-actions">
-          <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+          <button className="btn-secondary" onClick={onCancel}>取消</button>
           <button className={confirmClass} onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </div>

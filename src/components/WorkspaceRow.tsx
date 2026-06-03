@@ -59,7 +59,7 @@ export function WorkspaceRow({
         <button
           className={styles.expandBtn}
           onClick={onToggleExpand}
-          title={isExpanded ? "Collapse" : "Expand"}
+          title={isExpanded ? "收起" : "展开"}
         >
           {isExpanded ? "▼" : "▶"}
         </button>
@@ -80,7 +80,7 @@ export function WorkspaceRow({
           <button
             className={styles.btnNewSession}
             onClick={onLaunchSession}
-            title="New session"
+            title="新建会话"
           >
             +
           </button>
@@ -88,14 +88,14 @@ export function WorkspaceRow({
             <button
               className={styles.btnMore}
               onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
-              title="More actions"
+              title="更多操作"
             >
               ⋯
             </button>
             {menuOpen && (
               <div ref={menuRef} className={styles.workspaceMenu} onClick={(e) => e.stopPropagation()}>
                 <button onClick={() => { onEdit(); closeMenu(); }}>
-                  ✎ Edit
+                  ✎ 编辑
                 </button>
                 {onReorder && totalCount > 1 && (
                   <>
@@ -103,13 +103,13 @@ export function WorkspaceRow({
                       onClick={() => { onReorder("up"); closeMenu(); }}
                       disabled={idx === 0}
                     >
-                      ▲ Move up
+                      ▲ 上移
                     </button>
                     <button
                       onClick={() => { onReorder("down"); closeMenu(); }}
                       disabled={idx === totalCount - 1}
                     >
-                      ▼ Move down
+                      ▼ 下移
                     </button>
                   </>
                 )}
@@ -118,7 +118,7 @@ export function WorkspaceRow({
                   className={styles.danger}
                   onClick={() => { onDelete(); closeMenu(); }}
                 >
-                  ✕ Delete
+                  ✕ 删除
                 </button>
               </div>
             )}
@@ -131,7 +131,7 @@ export function WorkspaceRow({
         <div className={styles.sessionList}>
           {wsSessions.length === 0 && (
             <div className={styles.sessionEmpty}>
-              No sessions. Click <strong>+</strong> to launch one.
+              暂无会话。点击 <strong>+</strong> 启动
             </div>
           )}
           {wsSessions.map((session) => (
@@ -150,7 +150,7 @@ export function WorkspaceRow({
                   e.stopPropagation();
                   onStopSession(session.id);
                 }}
-                title="Stop session"
+                title="停止会话"
               >
                 ■
               </button>

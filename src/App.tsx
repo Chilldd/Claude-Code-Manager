@@ -96,7 +96,7 @@ function App() {
     try {
       const discovered = await api.importFromClaudeCode();
       if (discovered.length === 0) {
-        setInfoToast("All Claude Code projects have already been imported.");
+        setInfoToast("所有 Claude Code 项目已导入。");
         return;
       }
       let imported = 0;
@@ -112,10 +112,10 @@ function App() {
         if (ok) imported++;
       }
       if (imported > 0) {
-        setInfoToast(`Imported ${imported} workspace${imported > 1 ? 's' : ''} from Claude Code.`);
+        setInfoToast(`已从 Claude Code 导入 ${imported} 个项目`);
       }
     } catch (e) {
-      setPtyError(`Import failed: ${String(e)}`);
+      setPtyError(`导入失败：${String(e)}`);
     }
   }, [addWorkspace]);
 
@@ -129,7 +129,7 @@ function App() {
   if (loading) {
     return (
       <div className={styles.appLoading}>
-        Loading workspaces...
+        正在加载工作区…
       </div>
     );
   }
@@ -158,7 +158,7 @@ function App() {
             <button
               className={cn(styles.sidebarToggle, sidebarCollapsed && styles.collapsed)}
               onClick={toggleSidebar}
-              title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+              title={sidebarCollapsed ? "显示侧栏" : "收起侧栏"}
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 {sidebarCollapsed ? (
@@ -202,14 +202,14 @@ function App() {
 
       <ConfirmDialog
         open={!!confirmDeleteId}
-        title="Delete Workspace"
-        confirmLabel="Delete"
+        title="删除工作区"
+        confirmLabel="删除"
         confirmClass="btn-danger"
         message={
           <>
-            Are you sure you want to delete this workspace?
+            确定要删除此工作区？
             {confirmDeleteId && sessions.some((s) => s.workspaceId === confirmDeleteId) &&
-              " All running sessions will be terminated."}
+              " 所有正在运行的会话将被终止。"}
           </>
         }
         onConfirm={handleDeleteConfirm}
@@ -218,14 +218,12 @@ function App() {
 
       <ConfirmDialog
         open={showImportConfirm}
-        title="Import from Claude Code"
-        confirmLabel="Import"
+        title="从 Claude Code 导入"
+        confirmLabel="导入"
         message={
           <>
-            This will scan your Claude Code projects directory
-            (<code>~/.claude/projects/</code>) and import any workspaces not
-            already in your list. Each workspace will be configured with
-            default settings (command: <code>claude</code>).
+            将扫描 Claude Code 项目目录（<code>~/.claude/projects/</code>），
+            导入尚未添加的工作区。每个工作区将使用默认配置（命令：<code>claude</code>）。
           </>
         }
         onConfirm={() => {

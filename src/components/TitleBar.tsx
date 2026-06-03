@@ -29,7 +29,7 @@ export function TitleBar({ view, onViewChange, onAddWorkspace }: Props) {
         <button
           className={styles.titlebarBtn}
           onClick={toggleTheme}
-          title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+          title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
         >
           {theme === "dark" ? (
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -54,7 +54,7 @@ export function TitleBar({ view, onViewChange, onAddWorkspace }: Props) {
         <button
           className={cn(styles.viewToggle, view === "performance" && styles.active)}
           onClick={() => onViewChange("performance")}
-          title="Performance Monitor"
+          title="性能监控"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <polyline points="2,12 6,8 8,10 14,4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -64,7 +64,7 @@ export function TitleBar({ view, onViewChange, onAddWorkspace }: Props) {
         <button
           className={cn(styles.viewToggle, view === "terminal" && styles.active)}
           onClick={() => onViewChange("terminal")}
-          title="Terminal View"
+          title="终端视图"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <polyline points="4,10 8,6 4,2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -75,7 +75,7 @@ export function TitleBar({ view, onViewChange, onAddWorkspace }: Props) {
         <button
           className={cn(styles.titlebarBtn, styles.primary)}
           onClick={onAddWorkspace}
-          title="Add Workspace"
+          title="添加工作区"
         >
           +
         </button>
@@ -83,7 +83,7 @@ export function TitleBar({ view, onViewChange, onAddWorkspace }: Props) {
         <button
           className={styles.winBtn}
           onClick={() => getCurrentWindow().minimize().catch(console.error)}
-          title="Minimize"
+          title="最小化"
         >
           <svg width="10" height="10" viewBox="0 0 10 10">
             <rect x="1" y="4.5" width="8" height="1" fill="currentColor" />
@@ -92,7 +92,7 @@ export function TitleBar({ view, onViewChange, onAddWorkspace }: Props) {
         <button
           className={styles.winBtn}
           onClick={() => getCurrentWindow().toggleMaximize().catch(console.error)}
-          title="Maximize"
+          title="最大化"
         >
           <svg width="10" height="10" viewBox="0 0 10 10">
             <rect x="1.5" y="1.5" width="7" height="7" rx="0" fill="none" stroke="currentColor" strokeWidth="1" />
@@ -101,7 +101,7 @@ export function TitleBar({ view, onViewChange, onAddWorkspace }: Props) {
         <button
           className={cn(styles.winBtn, styles.winBtnClose)}
           onClick={() => getCurrentWindow().close().catch(console.error)}
-          title="Close"
+          title="关闭"
         >
           <svg width="10" height="10" viewBox="0 0 10 10">
             <line x1="2" y1="2" x2="8" y2="8" stroke="currentColor" strokeWidth="1.2" />

@@ -37,13 +37,13 @@ export function WorkspacePanel({
   return (
     <div className={cn(styles.panel, collapsed && styles.collapsed)}>
       <div className={styles.header}>
-        <h1>Workspaces</h1>
+        <h1>工作区</h1>
         <div className={styles.headerActions}>
           {onImportClaude && (
             <button
               className={styles.headerBtn}
               onClick={onImportClaude}
-              title="Import workspaces from Claude Code"
+              title="从 Claude Code 导入工作区"
             >
               CC
             </button>
@@ -51,7 +51,7 @@ export function WorkspacePanel({
           <button
             className={cn(styles.headerBtn, styles.primary)}
             onClick={onAdd}
-            title="Add Workspace"
+            title="添加工作区"
           >
             +
           </button>
@@ -60,9 +60,9 @@ export function WorkspacePanel({
       <div className={styles.workspaceList}>
         {workspaces.length === 0 ? (
           <p className={styles.emptyHint}>
-            No workspaces yet.
+            暂无工作区。
             <br />
-            Click <strong>+</strong> to add one.
+            点击 <strong>+</strong> 添加
           </p>
         ) : (
           workspaces.map((ws, idx) => (

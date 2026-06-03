@@ -149,7 +149,7 @@ export function TerminalPanel() {
     }).catch(() => () => {});
 
     const unlistenExit = onPtyExit((payload: PtyExitEvent) => {
-      const msg = "\r\n\x1b[33m[Process exited]\x1b[0m\r\n";
+      const msg = "\r\n\x1b[33m[进程已退出]\x1b[0m\r\n";
       const instances = termInstancesRef.current;
       const inst = instances.get(payload.session_id);
       if (inst) {
@@ -431,7 +431,7 @@ export function TerminalPanel() {
               </svg>
             </span>
             <p>此组暂无会话，请从工作区启动新会话</p>
-            <span className={styles.terminalPlaceholderHint}>This group is empty. Launch a session from the sidebar.</span>
+            <span className={styles.terminalPlaceholderHint}>此组为空，请从侧栏启动会话</span>
           </div>
         )}
       </div>
@@ -443,8 +443,8 @@ export function TerminalPanel() {
               <line x1="18" y1="26" x2="26" y2="26" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           </span>
-          <p>Expand a workspace, then click <strong>+</strong> to start a session</p>
-          <span className={styles.terminalPlaceholderHint}>Ctrl+Shift+P to open command palette</span>
+          <p>展开工作区，点击 <strong>+</strong> 启动会话</p>
+          <span className={styles.terminalPlaceholderHint}>Ctrl+Shift+P 打开命令面板</span>
         </div>
       )}
 
