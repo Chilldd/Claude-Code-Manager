@@ -246,46 +246,6 @@ export function TerminalPanel({
       term.loadAddon(fitAddon);
       term.open(container);
 
-      // Fix IME composition: keep xterm's hidden helper textarea at the
-      // terminal cursor position at ALL times (not just on compositionstart).
-      // This way the native IME candidate window always appears at the right
-      // place regardless of split-screen mode - the browser reads the textarea
-      // position synchronously when IME activates, so lazy positioning on
-      // compositionstart is too late.
-      const imeTextarea = container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
-      if (imeTextarea) {
-        const syncTextareaToCursor = () => {
-          const termEl = term.element;
-          const screen = termEl?.querySelector<HTMLDivElement>(".xterm-screen");
-          if (!screen) return;
-          const sr = screen.getBoundingClientRect();
-          const cellW = sr.width / term.cols;
-          const cellH = sr.height / term.rows;
-          const cx = term.buffer.active.cursorX;
-          const cy = term.buffer.active.cursorY;
-          imeTextarea.style.position = "fixed";
-          imeTextarea.style.left = `${sr.left + cx * cellW}px`;
-          imeTextarea.style.top = `${sr.top + cy * cellH}px`;
-        };
-
-        // Sync textarea to cursor on every cursor move so the IME candidate
-        // window always appears at the right position.
-        term.onCursorMove(syncTextareaToCursor);
-        // Also sync once immediately since onCursorMove may not fire
-        // until the cursor actually moves.
-        syncTextareaToCursor();
-
-        imeTextarea.addEventListener("compositionstart", () => {
-          // Hide cursor during IME composition — the candidate window
-          // serves as the visual feedback, not the terminal cursor.
-          term.options.cursorStyle = "none";
-        });
-        imeTextarea.addEventListener("compositionend", () => {
-          term.options.cursorStyle = "bar";
-          term.options.cursorBlink = true;
-        });
-      }
-
       try {
         fitAddon.fit();
         const dims = fitAddon.proposeDimensions();
