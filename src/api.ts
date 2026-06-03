@@ -125,7 +125,7 @@ export const api = {
 
   /** Scan git worktrees in a directory */
   scanWorktrees: (path: string) =>
-    invoke<{ name: string; path: string }[]>("scan_worktrees", { path }),
+    invoke<{ name: string; path: string; active: boolean }[]>("scan_worktrees", { path }),
 };
 
 // ── Event listeners (event-driven, replaces polling) ──

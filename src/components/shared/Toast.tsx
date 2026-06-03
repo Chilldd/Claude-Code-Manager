@@ -14,7 +14,7 @@ export function Toast({
   error,
   ptyError,
   infoToast,
-  onDismissError,
+  onDismissError: _onDismissError,
   onDismissPtyError,
   onDismissInfo,
   onRetry,

@@ -9,7 +9,6 @@ import type {
 import {
   MAX_GROUP_SIZE,
   nextGroupInfo,
-  isSpinnerChar,
   inferStatus,
   isPermissionPrompt,
 } from "../types";

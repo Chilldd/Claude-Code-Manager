@@ -411,6 +411,7 @@ export function TerminalPanel() {
           />
           <SessionTabs
             sessions={activeGroupSessions}
+            activeGroupId={activeGroupId}
             selectedSessionId={selectedSessionId}
             splitMode={splitMode}
             onSelectSession={selectSession}
