@@ -246,35 +246,6 @@ export function TerminalPanel({
       term.loadAddon(fitAddon);
       term.open(container);
 
-      // Suppress IME composition intermediate data from reaching the PTY.
-      // When typing Chinese (pinyin → candidate → commit), the intermediate
-      // letters can leak to the terminal before compositionstart fires.
-      // We intercept onData during composition and only let the final
-      // committed text through after compositionend.
-      let isComposing = false;
-      let imeSeq = 0;
-      // Ring buffer: keep last 5 onData calls so we can dump what was sent
-      // just before compositionstart (the likely leak window).
-      const onDataRingBuf: string[] = [];
-      const imeTextarea = container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
-      if (imeTextarea) {
-        imeTextarea.addEventListener("compositionstart", () => {
-          imeSeq++;
-          console.log("[IME] #%d compositionstart", imeSeq);
-          // Dump ring buffer: show what data was sent right before
-          // (first character of pinyin often leaks here)
-          if (onDataRingBuf.length > 0) {
-            console.log("[IME] #%d PRE-start data: %s", imeSeq, onDataRingBuf.join(" "));
-            onDataRingBuf.length = 0;
-          }
-          isComposing = true;
-        });
-        imeTextarea.addEventListener("compositionend", (e) => {
-          console.log("[IME] #%d compositionend data=%s", imeSeq, e.data);
-          isComposing = false;
-        });
-      }
-
       try {
         fitAddon.fit();
         const dims = fitAddon.proposeDimensions();
@@ -288,19 +259,6 @@ export function TerminalPanel({
       });
 
       term.onData((data) => {
-        if (isComposing) {
-          console.log("[IME] #%d BLOCKED", imeSeq, data);
-          return;
-        }
-        // First onData after compositionend = the committed text
-        if (imeSeq > 0) {
-          console.log("[IME] #%d COMMIT", imeSeq, data);
-          imeSeq = 0; // reset so subsequent data doesn't get COMMIT label
-        }
-        // Keep ring buffer (sliding window of last 5) so we can see
-        // what was sent moments before compositionstart.
-        onDataRingBuf.push(data);
-        if (onDataRingBuf.length > 5) onDataRingBuf.shift();
         api.writePty(session.id, data).catch(() => {
           term.write(data);
         });
