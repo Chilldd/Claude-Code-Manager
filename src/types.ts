@@ -11,6 +11,8 @@ export interface SessionInfo {
   name: string;
   sessionIndex: number;
   status: SessionStatus;
+  /** Set when session was launched with --worktree <name> */
+  worktreeName?: string;
 }
 
 export interface SessionGroup {

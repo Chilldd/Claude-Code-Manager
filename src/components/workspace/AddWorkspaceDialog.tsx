@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Workspace } from "../api";
+import type { Workspace } from "../../api";
 
 interface Props {
   workspace?: Workspace;            // if provided, we're editing

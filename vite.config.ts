@@ -13,8 +13,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     watch: {
-      // Tell vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // Tell vite to ignore watching `src-tauri` and `.claude/worktrees/`
+      ignored: ["**/src-tauri/**", "**/.claude/worktrees/**"],
     },
   },
 

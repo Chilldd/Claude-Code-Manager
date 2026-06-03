@@ -15,6 +15,7 @@ paths:
 - **业务逻辑封装在 Hook**：领域逻辑（CRUD、事件订阅）放自定义 Hook，不写在组件里。
 - **错误边界**：独立功能面板用 ErrorBoundary 包裹，防止一个崩溃波及全局。
 - **正确清理**：`useEffect` 中的事件监听/订阅必须返回 cleanup 函数。
+- **按业务领域组织**：`src/components/` 下按业务领域分子文件夹（`workspace/`、`terminal/`、`performance/`、`shell/`、`shared/`），禁止将所有组件平铺在 components 根目录。
 
 ## 样式
 

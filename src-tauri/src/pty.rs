@@ -6,6 +6,8 @@ use std::thread;
 use sysinfo::ProcessesToUpdate;
 use tauri::{Emitter, WebviewWindow};
 
+use crate::log::debug_log;
+
 // ── Event payloads ──
 
 #[derive(Debug, Clone, Serialize)]
@@ -165,6 +167,8 @@ impl PtyManager {
         }
         cmd_builder.cwd(cwd);
 
+        eprintln!("[pty] create: cmd={}, args={:?}, cwd={}", command, args, cwd);
+
         for (key, value) in &env {
             cmd_builder.env(key, value);
         }
@@ -183,8 +187,10 @@ impl PtyManager {
             },
         );
 
+        eprintln!("[pty] spawning command...");
         let child = pair.slave.spawn_command(cmd_builder).map_err(|e| {
             let msg = format!("PTY spawn: {}", e);
+            eprintln!("[pty] spawn FAILED: {}", msg);
             let _ = window.emit(
                 "pty-output",
                 PtyOutputPayload {
@@ -211,12 +217,16 @@ impl PtyManager {
         // Reader thread — emits PTY events scoped by session_id
         let win = window.clone();
         let sid = session_id.clone();
+        eprintln!("[pty] reader thread spawning for {}", sid);
         thread::spawn(move || {
+            eprintln!("[pty] reader thread STARTED for {}", sid);
             let mut buf = vec![0u8; 65536];
             let mut reader = reader;
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) => {
+                        debug_log(format!("[pty] reader EOF session={}", sid));
+                        eprintln!("[pty] reader EOF for {}", sid);
                         let _ = win.emit(
                             "pty-output",
                             PtyOutputPayload {
@@ -258,6 +268,8 @@ impl PtyManager {
                         }
                     }
                     Err(e) => {
+                        debug_log(format!("[pty] reader error session={}: {}", sid, e));
+                        eprintln!("[pty] reader error for {}: {}", sid, e);
                         let msg = format!("\r\n[PTY error: {}]\r\n", e);
                         let _ = win.emit(
                             "pty-output",
@@ -284,18 +296,26 @@ impl PtyManager {
 
     pub fn write(&mut self, session_id: &str, data: &str) -> Result<(), String> {
         let session = self.sessions.get_mut(session_id).ok_or_else(|| {
-            format!("Session not found: {}", session_id)
+            let msg = format!("Session not found: {}", session_id);
+            debug_log(format!("[pty] write: {}", msg));
+            msg
         })?;
         let writer = session.writer.as_mut().ok_or("No active PTY")?;
         writer
             .write_all(data.as_bytes())
             .and_then(|_| writer.flush())
-            .map_err(|e| format!("PTY write: {}", e))
+            .map_err(|e| {
+                let msg = format!("PTY write: {}", e);
+                debug_log(format!("[pty] write error: {}", msg));
+                msg
+            })
     }
 
     pub fn resize(&mut self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
         let session = self.sessions.get(session_id).ok_or_else(|| {
-            format!("Session not found: {}", session_id)
+            let msg = format!("Session not found: {}", session_id);
+            debug_log(format!("[pty] resize: {}", msg));
+            msg
         })?;
         if let Some(master) = &session.master {
             master
@@ -305,7 +325,11 @@ impl PtyManager {
                     pixel_width: 0,
                     pixel_height: 0,
                 })
-                .map_err(|e| format!("PTY resize: {}", e))
+                .map_err(|e| {
+                    let msg = format!("PTY resize({}x{}): {}", cols, rows, e);
+                    debug_log(format!("[pty] resize error: {}", msg));
+                    msg
+                })
         } else {
             Ok(())
         }
@@ -314,6 +338,7 @@ impl PtyManager {
     /// Kill a specific session. Returns `true` if a session was found.
     pub fn kill(&mut self, session_id: &str) -> bool {
         if let Some(mut session) = self.sessions.remove(session_id) {
+            debug_log(format!("[pty] kill session={}", session_id));
             if let Some(mut child) = session.child.take() {
                 let _ = child.kill();
             }
@@ -321,6 +346,7 @@ impl PtyManager {
             session.master.take();
             true
         } else {
+            debug_log(format!("[pty] kill: session not found {}", session_id));
             false
         }
     }

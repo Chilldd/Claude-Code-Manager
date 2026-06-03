@@ -4,7 +4,7 @@ import {
   onProcessTreeUpdated,
   onProcessesDiff,
   onSessionStateChanged,
-} from "../api";
+} from "../../api";
 import type {
   SystemMetrics,
   ProcessTreePayload,
@@ -12,8 +12,8 @@ import type {
   SessionStatePayload,
   ProcessNode,
   FlatProcessInfo,
-} from "../api";
-import type { SessionInfo } from "../types";
+} from "../../api";
+import type { SessionInfo } from "../../types";
 import styles from "./PerformancePanel.module.css";
 
 interface Props {

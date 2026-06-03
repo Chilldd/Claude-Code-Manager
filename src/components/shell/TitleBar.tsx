@@ -1,6 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useTheme } from "../contexts/ThemeContext";
-import { cn } from "../utils/cn";
+import { useTheme } from "../../contexts/ThemeContext";
+import { cn } from "../../utils/cn";
 import styles from "./TitleBar.module.css";
 
 interface Props {

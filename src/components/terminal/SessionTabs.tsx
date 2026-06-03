@@ -1,6 +1,6 @@
 import { useRef } from "react";
-import type { SessionInfo } from "../types";
-import { cn } from "../utils/cn";
+import type { SessionInfo } from "../../types";
+import { cn } from "../../utils/cn";
 import styles from "./TerminalPanel.module.css";
 
 interface Props {
@@ -48,6 +48,7 @@ export function SessionTabs({
           key={session.id}
           className={cn(styles.terminalTab, session.id === selectedSessionId && styles.active)}
           onClick={() => onSelectSession(session.id)}
+          data-tooltip={session.worktreeName ? `Worktree: ${session.worktreeName}` : undefined}
           draggable
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = 'move';
@@ -57,7 +58,12 @@ export function SessionTabs({
           onDragEnd={() => { dragSessionIdRef.current = null; }}
         >
           <span className={`${styles.tabIndicator} ${styles[session.status as keyof typeof styles] || ''}`} />
-          <span className={styles.tabLabel}>{session.name}</span>
+          <span className={styles.tabLabel}>
+            {session.worktreeName && (
+              <span style={{ marginRight: 3, fontSize: 10 }}>🌿</span>
+            )}
+            {session.name}
+          </span>
           <button
             className={styles.tabClose}
             onClick={(e) => {

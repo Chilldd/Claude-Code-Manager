@@ -1,14 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
-import { api, onPtyOutput, onPtyExit } from "../api";
-import type { PtyOutputEvent, PtyExitEvent } from "../api";
-import { useSession } from "../contexts/SessionContext";
+import { api, onPtyOutput, onPtyExit } from "../../api";
+import type { PtyOutputEvent, PtyExitEvent } from "../../api";
+import { useSession } from "../../contexts/SessionContext";
 import "xterm/css/xterm.css";
-import "../styles/terminal-global.css";
+import "../../styles/terminal-global.css";
 import { GroupTabs } from "./GroupTabs";
 import { SessionTabs } from "./SessionTabs";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "../shared/ConfirmDialog";
 import styles from "./TerminalPanel.module.css";
 
 /* ── Windows Terminal "Dark+" (Campbell) color scheme ── */
@@ -339,7 +339,7 @@ export function TerminalPanel() {
     }, 0);
   }, [sessions, activeGroupSessions, selectedSessionId, splitMode]);
 
-  // ── Refit on container resize (debounce > sidebar transition 250ms) ──
+  // ── Refit on container resize ──
   useEffect(() => {
     const root = containerRootRef.current;
     if (!root) return;
@@ -353,7 +353,7 @@ export function TerminalPanel() {
           ? allIds
           : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
         refitVisible(ids, termInstancesRef.current);
-      }, 350);
+      }, 250);
     });
     observer.observe(root);
     return () => {

@@ -25,7 +25,7 @@ export interface SessionManager {
   activeGroupSessionIds: string[];
   activeGroupSessions: SessionInfo[];
 
-  launchSession: (ws: Workspace) => Promise<void>;
+  launchSession: (ws: Workspace, worktreeName?: string) => Promise<void>;
   stopSession: (sessionId: string) => Promise<void>;
   selectSession: (sessionId: string) => void;
   toggleExpand: (workspaceId: string) => void;
@@ -240,9 +240,10 @@ export function useSessionManager(): SessionManager {
   }, []);
 
   const launchSession = useCallback(
-    async (ws: Workspace) => {
+    async (ws: Workspace, worktreeName?: string) => {
       const sessionIndex = nextSessionIndex();
       const sessionName = `[${sessionIndex}] ${ws.name}`;
+      api.debugLog(`launchSession: calling createPty cmd=${ws.command} args=${ws.args}`);
       try {
         const sessionId = await api.createPty(
           ws.id,
@@ -252,6 +253,10 @@ export function useSessionManager(): SessionManager {
           ws.path,
           ws.env
         );
+        api.debugLog(`launchSession: createPty OK sid=${sessionId}`);
+
+        // Step 1/4: add session to state
+        api.debugLog("launchSession: step1 setSessions");
         setSessions((prev) => [
           ...prev,
           {
@@ -261,10 +266,16 @@ export function useSessionManager(): SessionManager {
             name: sessionName,
             sessionIndex,
             status: "running" as const,
+            worktreeName,
           },
         ]);
-        setSelectedSessionId(sessionId);
+        api.debugLog("launchSession: step1 setSessions done");
 
+        api.debugLog("launchSession: step2 setSelectedSessionId");
+        setSelectedSessionId(sessionId);
+        api.debugLog("launchSession: step2 done");
+
+        api.debugLog("launchSession: step3 setGroups");
         setGroups((prev) => {
           const idx = prev.findIndex((g) => g.id === activeGroupId);
           if (idx >= 0 && prev[idx].sessionIds.length < MAX_GROUP_SIZE) {
@@ -280,13 +291,16 @@ export function useSessionManager(): SessionManager {
           setActiveGroupId(newGroup.id);
           return [...prev, newGroup];
         });
+        api.debugLog("launchSession: step3 setGroups done");
 
         if (ws.auto_prompt) {
           setTimeout(() => {
             api.writePty(sessionId, ws.auto_prompt + "\n").catch(() => {});
           }, 1500);
         }
+        api.debugLog("launchSession: ALL STEPS COMPLETE");
       } catch (e) {
+        api.debugLog(`launchSession CAUGHT: ${e}`);
         notifySession({
           title: "❌ Launch Error",
           sessionName: sessionName,

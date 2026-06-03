@@ -1,6 +1,6 @@
-import type { Workspace } from "../api";
-import { useSession } from "../contexts/SessionContext";
-import { cn } from "../utils/cn";
+import type { Workspace } from "../../api";
+import { useSession } from "../../contexts/SessionContext";
+import { cn } from "../../utils/cn";
 import { WorkspaceRow } from "./WorkspaceRow";
 import styles from "./WorkspacePanel.module.css";
 
@@ -8,8 +8,10 @@ interface Props {
   collapsed?: boolean;
   workspaces: Workspace[];
   onLaunchSession: (ws: Workspace) => void;
+  onLaunchWorktree: (ws: Workspace) => void;
   onEdit: (ws: Workspace) => void;
   onDelete: (workspaceId: string) => void;
+  onOpenInExplorer: (ws: Workspace) => void;
   onAdd: () => void;
   onImportClaude?: () => void;
   onReorder?: (workspaceId: string, direction: "up" | "down") => void;
@@ -19,8 +21,10 @@ export function WorkspacePanel({
   collapsed = false,
   workspaces,
   onLaunchSession,
+  onLaunchWorktree,
   onEdit,
   onDelete,
+  onOpenInExplorer,
   onAdd,
   onImportClaude,
   onReorder,
@@ -76,10 +80,12 @@ export function WorkspacePanel({
               selectedSessionId={selectedSessionId}
               onToggleExpand={() => toggleExpand(ws.id)}
               onLaunchSession={() => onLaunchSession(ws)}
+              onLaunchWorktree={() => onLaunchWorktree(ws)}
               onStopSession={stopSession}
               onSelectSession={selectSession}
               onEdit={() => onEdit(ws)}
               onDelete={() => onDelete(ws.id)}
+              onOpenInExplorer={() => onOpenInExplorer(ws)}
               onReorder={
                 onReorder
                   ? (dir) => onReorder(ws.id, dir)

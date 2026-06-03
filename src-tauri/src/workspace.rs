@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use crate::log::debug_log;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workspace {
     #[serde(default)]
@@ -38,7 +40,9 @@ fn data_dir() -> PathBuf {
     let mut path = home_dir();
     path.push(".ccmanager");
     if let Err(e) = fs::create_dir_all(&path) {
-        eprintln!("[workspace] Failed to create data dir {:?}: {}", path, e);
+        let msg = format!("Failed to create data dir {:?}: {}", path, e);
+        eprintln!("[workspace] {}", msg);
+        debug_log(format!("[workspace] {}", msg));
     }
     path
 }
@@ -60,7 +64,9 @@ pub fn load_all() -> Vec<Workspace> {
     let content = match fs::read_to_string(&path) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("[workspace] Failed to read {:?}: {}", path, e);
+            let msg = format!("Failed to read {:?}: {}", path, e);
+            eprintln!("[workspace] {}", msg);
+            debug_log(format!("[workspace] {}", msg));
             return vec![];
         }
     };
@@ -69,13 +75,16 @@ pub fn load_all() -> Vec<Workspace> {
         Ok(workspaces) => workspaces,
         Err(e) => {
             // ── Backup corrupted file before resetting ──
+            debug_log(format!("[workspace] Corrupted workspaces.json ({}). Backing up.", e));
             eprintln!(
                 "[workspace] Corrupted workspaces.json ({}). Backing up and resetting.",
                 e
             );
             let backup = path.with_extension("json.bak");
             if let Err(be) = fs::copy(&path, &backup) {
-                eprintln!("[workspace] Failed to backup corrupted file: {}", be);
+                let msg = format!("Failed to backup corrupted file: {}", be);
+                eprintln!("[workspace] {}", msg);
+                debug_log(format!("[workspace] {}", msg));
             } else {
                 eprintln!("[workspace] Backup saved to {:?}", backup);
             }
@@ -89,10 +98,16 @@ pub fn save_all(workspaces: &[Workspace]) {
     match serde_json::to_string_pretty(workspaces) {
         Ok(content) => {
             if let Err(e) = fs::write(&path, &content) {
-                eprintln!("[workspace] Failed to write {:?}: {}", path, e);
+                let msg = format!("Failed to write {:?}: {}", path, e);
+                eprintln!("[workspace] {}", msg);
+                debug_log(format!("[workspace] {}", msg));
             }
         }
-        Err(e) => eprintln!("[workspace] Failed to serialize workspaces: {}", e),
+        Err(e) => {
+            let msg = format!("Failed to serialize workspaces: {}", e);
+            eprintln!("[workspace] {}", msg);
+            debug_log(format!("[workspace] {}", msg));
+        }
     }
 }
 

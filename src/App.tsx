@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
-import { WorkspacePanel } from "./components/WorkspacePanel";
-import { TerminalPanel } from "./components/TerminalPanel";
-import { PerformancePanel } from "./components/PerformancePanel";
-import { AddWorkspaceDialog } from "./components/AddWorkspaceDialog";
-import { TitleBar } from "./components/TitleBar";
-import { Toast } from "./components/Toast";
-import { ConfirmDialog } from "./components/ConfirmDialog";
+import { WorkspacePanel } from "./components/workspace/WorkspacePanel";
+import { TerminalPanel } from "./components/terminal/TerminalPanel";
+import { PerformancePanel } from "./components/performance/PerformancePanel";
+import { AddWorkspaceDialog } from "./components/workspace/AddWorkspaceDialog";
+import { TitleBar } from "./components/shell/TitleBar";
+import { Toast } from "./components/shared/Toast";
+import { ConfirmDialog } from "./components/shared/ConfirmDialog";
+import { WorktreeDialog } from "./components/shared/WorktreeDialog";
 import { useWorkspaces } from "./hooks/useWorkspaces";
 import { useSession } from "./contexts/SessionContext";
 import { api } from "./api";
@@ -32,6 +33,7 @@ function App() {
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [worktreeDialogWs, setWorktreeDialogWs] = useState<Workspace | null>(null);
   const [ptyError, setPtyError] = useState<string | null>(null);
   const [infoToast, setInfoToast] = useState<string | null>(null);
   const [view, setView] = useState<"performance" | "terminal">("terminal");
@@ -69,6 +71,33 @@ function App() {
       if (ok) setEditingWorkspace(null);
     },
     [updateWorkspace]
+  );
+
+  const handleLaunchWorktree = useCallback(
+    async (ws: Workspace, worktreeName: string) => {
+      setPtyError(null);
+      try {
+        const modifiedWs = { ...ws, args: `--worktree ${worktreeName}` };
+        api.debugLog(`launchWorktree: cmd=${modifiedWs.command} args=${modifiedWs.args}`);
+        await launchSession(modifiedWs, worktreeName);
+        api.debugLog("launchWorktree: launchSession completed OK");
+      } catch (e) {
+        api.debugLog(`launchWorktree FAILED: ${e}`);
+        setPtyError(String(e));
+      }
+    },
+    [launchSession]
+  );
+
+  const handleOpenInExplorer = useCallback(
+    async (ws: Workspace) => {
+      try {
+        await api.openInExplorer(ws.path);
+      } catch (e) {
+        setPtyError(String(e));
+      }
+    },
+    []
   );
 
   const handleReorder = useCallback(
@@ -149,8 +178,10 @@ function App() {
               collapsed={sidebarCollapsed}
               workspaces={workspaces}
               onLaunchSession={handleLaunchSession}
+              onLaunchWorktree={setWorktreeDialogWs}
               onEdit={setEditingWorkspace}
               onDelete={setConfirmDeleteId}
+              onOpenInExplorer={handleOpenInExplorer}
               onAdd={() => setShowAddDialog(true)}
               onImportClaude={() => setShowImportConfirm(true)}
               onReorder={handleReorder}
@@ -215,6 +246,17 @@ function App() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setConfirmDeleteId(null)}
       />
+
+      {worktreeDialogWs && (
+        <WorktreeDialog
+          path={worktreeDialogWs.path}
+          onConfirm={(worktreeName) => {
+            setWorktreeDialogWs(null);
+            handleLaunchWorktree(worktreeDialogWs, worktreeName);
+          }}
+          onCancel={() => setWorktreeDialogWs(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={showImportConfirm}

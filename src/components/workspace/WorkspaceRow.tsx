@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { Workspace } from "../api";
-import type { SessionInfo } from "../types";
-import { cn } from "../utils/cn";
+import type { Workspace } from "../../api";
+import type { SessionInfo } from "../../types";
+import { cn } from "../../utils/cn";
 import styles from "./WorkspacePanel.module.css";
 
 interface Props {
@@ -13,10 +13,12 @@ interface Props {
   selectedSessionId: string | null;
   onToggleExpand: () => void;
   onLaunchSession: () => void;
+  onLaunchWorktree: () => void;
   onStopSession: (sessionId: string) => void;
   onSelectSession: (sessionId: string) => void;
   onEdit: () => void;
   onDelete: () => void;
+  onOpenInExplorer?: () => void;
   onReorder?: (direction: "up" | "down") => void;
 }
 
@@ -29,10 +31,12 @@ export function WorkspaceRow({
   selectedSessionId,
   onToggleExpand,
   onLaunchSession,
+  onLaunchWorktree,
   onStopSession,
   onSelectSession,
   onEdit,
   onDelete,
+  onOpenInExplorer,
   onReorder,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -84,6 +88,13 @@ export function WorkspaceRow({
           >
             +
           </button>
+          <button
+            className={styles.btnWorktree}
+            onClick={onLaunchWorktree}
+            title="启动 Worktree 会话"
+          >
+            🌿
+          </button>
           <div className={styles.workspaceMenuWrapper}>
             <button
               className={styles.btnMore}
@@ -95,7 +106,8 @@ export function WorkspaceRow({
             {menuOpen && (
               <div ref={menuRef} className={styles.workspaceMenu} onClick={(e) => e.stopPropagation()}>
                 <button onClick={() => { onEdit(); closeMenu(); }}>
-                  ✎ 编辑
+                  <span className={styles.menuIcon}>✎</span>
+                  编辑
                 </button>
                 {onReorder && totalCount > 1 && (
                   <>
@@ -103,22 +115,31 @@ export function WorkspaceRow({
                       onClick={() => { onReorder("up"); closeMenu(); }}
                       disabled={idx === 0}
                     >
-                      ▲ 上移
+                      <span className={styles.menuIcon}>▲</span>
+                      上移
                     </button>
                     <button
                       onClick={() => { onReorder("down"); closeMenu(); }}
                       disabled={idx === totalCount - 1}
                     >
-                      ▼ 下移
+                      <span className={styles.menuIcon}>▼</span>
+                      下移
                     </button>
                   </>
+                )}
+                {onOpenInExplorer && (
+                  <button onClick={() => { onOpenInExplorer(); closeMenu(); }}>
+                    <span className={styles.menuIcon}>📂</span>
+                    打开所在目录
+                  </button>
                 )}
                 <div className={styles.workspaceMenuSep} />
                 <button
                   className={styles.danger}
                   onClick={() => { onDelete(); closeMenu(); }}
                 >
-                  ✕ 删除
+                  <span className={styles.menuIcon}>✕</span>
+                  删除
                 </button>
               </div>
             )}
@@ -139,10 +160,12 @@ export function WorkspaceRow({
               key={session.id}
               className={cn(styles.sessionItem, session.id === selectedSessionId && styles.selected)}
               onClick={() => onSelectSession(session.id)}
+              data-tooltip={session.worktreeName ? `Worktree: ${session.worktreeName}` : undefined}
             >
               <span
                 className={`${styles.sessionIndicator} ${styles[session.status as keyof typeof styles] || ''}`}
               />
+              {session.worktreeName && <span style={{ fontSize: 11, marginRight: 2 }}>🌿</span>}
               <span className={styles.sessionName}>{session.name}</span>
               <button
                 className={styles.sessionStop}

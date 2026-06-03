@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../../utils/cn";
 import styles from "./TerminalPanel.module.css";
 
 interface GroupTabItem {

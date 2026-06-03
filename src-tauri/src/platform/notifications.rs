@@ -1,3 +1,4 @@
+use crate::log::debug_log;
 use windows::core::HSTRING;
 
 /// Escape special XML characters for safe inclusion in Toast XML.
@@ -52,7 +53,9 @@ pub fn send_toast_with_deeplink(
         let hid = HSTRING::from(identifier);
         if let Ok(doc) = windows::Data::Xml::Dom::XmlDocument::new() {
             if doc.LoadXml(&hxml).is_err() {
-                eprintln!("[notifications] Failed to load Toast XML");
+                let msg = "Failed to load Toast XML";
+                eprintln!("[notifications] {}", msg);
+                debug_log(format!("[notifications] {}", msg));
                 return;
             }
             if let Ok(notification) =
@@ -65,13 +68,19 @@ pub fn send_toast_with_deeplink(
                 {
                     _ = notifier.Show(&notification);
                 } else {
-                    eprintln!("[notifications] Failed to create ToastNotifier");
+                    let msg = "Failed to create ToastNotifier";
+                    eprintln!("[notifications] {}", msg);
+                    debug_log(format!("[notifications] {}", msg));
                 }
             } else {
-                eprintln!("[notifications] Failed to create ToastNotification");
+                let msg = "Failed to create ToastNotification";
+                eprintln!("[notifications] {}", msg);
+                debug_log(format!("[notifications] {}", msg));
             }
         } else {
-            eprintln!("[notifications] Failed to create XmlDocument");
+            let msg = "Failed to create XmlDocument";
+            eprintln!("[notifications] {}", msg);
+            debug_log(format!("[notifications] {}", msg));
         }
     }
 }

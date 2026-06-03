@@ -4,6 +4,7 @@ use super::{
     is_excluded, FlatProcessInfo, MetricsCmd, ProcessTreePayload, ProcessesDiffPayload,
     SessionStatePayload, SystemMetricsPayload,
 };
+use crate::log::debug_log;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 use std::time::Duration;
@@ -30,7 +31,9 @@ impl MetricsEngine {
     /// Send a command to the background thread (TrackSession / UntrackSession).
     pub fn send(&self, cmd: MetricsCmd) {
         if let Err(e) = self.cmd_tx.send(cmd) {
-            eprintln!("[metrics] Failed to send command: {}", e);
+            let msg = format!("Failed to send command: {}", e);
+            eprintln!("[metrics] {}", msg);
+            debug_log(format!("[metrics] {}", msg));
         }
     }
 }
@@ -118,6 +121,9 @@ impl MetricsEngineInner {
                 }
             }
 
+            if self.tick % 5 == 0 {
+                eprintln!("[metrics] tick={} sessions={} alive", self.tick, self.sessions.len());
+            }
             std::thread::sleep(Duration::from_secs(1));
         }
     }

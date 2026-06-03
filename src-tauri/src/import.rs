@@ -1,4 +1,4 @@
-use crate::workspace;
+use crate::{log::debug_log, workspace};
 use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader};
@@ -33,7 +33,9 @@ pub fn import_from_claude_code() -> Vec<workspace::Workspace> {
     let entries = match fs::read_dir(&projects_dir) {
         Ok(e) => e,
         Err(e) => {
-            eprintln!("[import] Failed to read {:?}: {}", projects_dir, e);
+            let msg = format!("Failed to read {:?}: {}", projects_dir, e);
+            eprintln!("[import] {}", msg);
+            debug_log(format!("[import] {}", msg));
             return vec![];
         }
     };
@@ -143,7 +145,9 @@ fn extract_cwd_from_session(project_dir: &Path) -> Option<String> {
         let file = match fs::File::open(entry.path()) {
             Ok(f) => f,
             Err(e) => {
-                eprintln!("[import] Failed to open {:?}: {}", entry.path(), e);
+                let msg = format!("Failed to open {:?}: {}", entry.path(), e);
+                eprintln!("[import] {}", msg);
+                debug_log(format!("[import] {}", msg));
                 continue;
             }
         };
@@ -163,7 +167,9 @@ fn extract_cwd_from_session(project_dir: &Path) -> Option<String> {
                     }
                 }
                 Err(e) => {
-                    eprintln!("[import] Read error on {:?}: {}", entry.path(), e);
+                    let msg = format!("Read error on {:?}: {}", entry.path(), e);
+                    eprintln!("[import] {}", msg);
+                    debug_log(format!("[import] {}", msg));
                     break;
                 }
             }

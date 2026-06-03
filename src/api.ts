@@ -114,6 +114,18 @@ export const api = {
   /** Import workspaces from Claude Code's project directory (~/.claude/projects/) */
   importFromClaudeCode: () =>
     invoke<Workspace[]>("import_from_claude_code"),
+
+  /** Open a directory in the system file explorer */
+  openInExplorer: (path: string) =>
+    invoke<void>("open_in_explorer", { path }),
+
+  /** Append to the persistent debug log file (survives webview refresh) */
+  debugLog: (msg: string) =>
+    invoke<void>("frontend_log", { msg }).catch(() => {}),
+
+  /** Scan git worktrees in a directory */
+  scanWorktrees: (path: string) =>
+    invoke<{ name: string; path: string }[]>("scan_worktrees", { path }),
 };
 
 // ── Event listeners (event-driven, replaces polling) ──

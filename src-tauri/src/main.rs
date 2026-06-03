@@ -3,14 +3,23 @@
 
 mod errors;
 mod import;
+pub mod log;
 mod metrics;
 mod platform;
 mod pty;
 mod workspace;
 
 use errors::AppError;
+use log::debug_log;
+use serde::Serialize;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, WebviewWindow};
+
+/// Frontend-facing wrapper so JS can log to the same file
+#[tauri::command]
+fn frontend_log(msg: String) {
+    debug_log(format!("[frontend] {}", msg));
+}
 
 // ── AppState ──
 
@@ -66,7 +75,14 @@ fn create_pty(
     cwd: String,
     env: std::collections::HashMap<String, String>,
 ) -> Result<String, AppError> {
-    let mut pty = state.pty.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    debug_log(format!("create_pty: cmd={}, args={}, cwd={}", command, args, cwd));
+
+    let mut pty = state.pty.lock().map_err(|e| {
+        let msg = format!("pty lock: {}", e);
+        debug_log(&msg);
+        AppError::Internal(msg)
+    })?;
+
     let (session_id, root_pids) = pty.create(
         &window,
         &workspace_id,
@@ -75,16 +91,29 @@ fn create_pty(
         &args,
         &cwd,
         env,
-    ).map_err(AppError::PtyError)?;
+    ).map_err(|e| {
+        debug_log(format!("pty.create FAILED: {}", e));
+        AppError::PtyError(e)
+    })?;
+
+    debug_log(format!("create_pty OK: session_id={}", session_id));
 
     // Notify metrics engine to start tracking this session's processes
-    let metrics = state.metrics.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    debug_log("about to lock metrics");
+    let metrics = state.metrics.lock().map_err(|e| {
+        let msg = format!("metrics lock: {}", e);
+        debug_log(&msg);
+        AppError::Internal(msg)
+    })?;
+    debug_log("metrics locked, sending TrackSession");
     metrics.send(metrics::MetricsCmd::TrackSession {
         session_id: session_id.clone(),
         root_pids,
     });
+    debug_log("TrackSession sent");
 
     // Emit session-created event to frontend
+    debug_log("about to emit session-created");
     if let Err(e) = window.emit(
         "session-created",
         pty::SessionCreatedPayload {
@@ -96,6 +125,7 @@ fn create_pty(
         eprintln!("[main] Failed to emit session-created: {}", e);
     }
 
+    debug_log("create_pty returning OK");
     Ok(session_id)
 }
 
@@ -105,8 +135,10 @@ fn write_pty(
     session_id: String,
     data: String,
 ) -> Result<(), AppError> {
-    let mut pty = state.pty.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-    pty.write(&session_id, &data).map_err(AppError::PtyError)
+    let mut pty = state.pty.lock()
+        .map_err(|e| { debug_log(format!("[main] write_pty lock error: {}", e)); AppError::Internal(e.to_string()) })?;
+    pty.write(&session_id, &data)
+        .map_err(|e| { debug_log(format!("[main] write_pty error session={}: {}", session_id, e)); AppError::PtyError(e) })
 }
 
 #[tauri::command]
@@ -116,8 +148,10 @@ fn resize_pty(
     cols: u16,
     rows: u16,
 ) -> Result<(), AppError> {
-    let mut pty = state.pty.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-    pty.resize(&session_id, cols, rows).map_err(AppError::PtyError)
+    let mut pty = state.pty.lock()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    pty.resize(&session_id, cols, rows)
+        .map_err(|e| { debug_log(format!("[main] resize_pty error session={}: {}", session_id, e)); AppError::PtyError(e) })
 }
 
 #[tauri::command]
@@ -126,11 +160,14 @@ fn kill_pty(
     state: tauri::State<'_, AppState>,
     session_id: String,
 ) -> Result<(), AppError> {
-    let mut pty = state.pty.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    debug_log(format!("[main] kill_pty session={}", session_id));
+    let mut pty = state.pty.lock()
+        .map_err(|e| { debug_log(format!("[main] kill_pty lock error: {}", e)); AppError::Internal(e.to_string()) })?;
     pty.kill(&session_id);
 
     // Notify metrics engine to stop tracking
-    let metrics = state.metrics.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let metrics = state.metrics.lock()
+        .map_err(|e| { debug_log(format!("[main] kill_pty metrics lock error: {}", e)); AppError::Internal(e.to_string()) })?;
     metrics.send(metrics::MetricsCmd::UntrackSession {
         session_id: session_id.clone(),
     });
@@ -153,7 +190,8 @@ fn is_pty_active(
     state: tauri::State<'_, AppState>,
     session_id: String,
 ) -> Result<bool, AppError> {
-    let pty = state.pty.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let pty = state.pty.lock()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(pty.is_active(&session_id))
 }
 
@@ -161,8 +199,75 @@ fn is_pty_active(
 fn list_active_sessions(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<pty::SessionInfo>, AppError> {
-    let pty = state.pty.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let pty = state.pty.lock()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(pty.list_active())
+}
+
+#[tauri::command]
+fn open_in_explorer(path: String) -> Result<(), String> {
+    debug_log(format!("[main] open_in_explorer path={}", path));
+    let path = std::path::Path::new(&path);
+    if !path.exists() {
+        let msg = format!("路径不存在：{}", path.display());
+        debug_log(format!("[main] open_in_explorer: {}", msg));
+        return Err(msg);
+    }
+    let canonical = path.canonicalize()
+        .map_err(|e| { let m = format!("无法解析路径：{}", e); debug_log(format!("[main] open_in_explorer: {}", m)); m })?;
+    // On Windows, use explorer.exe to open the directory
+    std::process::Command::new("explorer")
+        .arg(canonical.as_os_str())
+        .spawn()
+        .map_err(|e| { let m = format!("无法打开资源管理器：{}", e); debug_log(format!("[main] open_in_explorer: {}", m)); m })?;
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct WorktreeInfo {
+    name: String,
+    path: String,
+    active: bool, // true = has actual content, false = orphaned empty directory
+}
+
+#[tauri::command]
+fn scan_worktrees(path: String) -> Result<Vec<WorktreeInfo>, String> {
+    debug_log(format!("[main] scan_worktrees path={}", path));
+    let worktrees_dir = std::path::Path::new(&path).join(".claude").join("worktrees");
+
+    if !worktrees_dir.exists() {
+        debug_log("[main] scan_worktrees: no .claude/worktrees dir");
+        return Ok(Vec::new()); // No worktrees yet, not an error
+    }
+
+    let mut worktrees = Vec::new();
+    let entries = std::fs::read_dir(&worktrees_dir)
+        .map_err(|e| { let m = format!("无法读取 worktrees 目录：{}", e); debug_log(format!("[main] scan_worktrees: {}", m)); m })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("读取目录项失败：{}", e))?;
+        if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            let name = entry.file_name();
+            let name = name.to_string_lossy().to_string();
+            // Skip empty names or hidden files
+            if !name.is_empty() && !name.starts_with('.') {
+                // Check if directory has actual content (not just . and ..)
+                let has_content = std::fs::read_dir(entry.path())
+                    .map(|mut rd| rd.next().is_some())
+                    .unwrap_or(false);
+                worktrees.push(WorktreeInfo {
+                    path: entry.path().to_string_lossy().to_string(),
+                    name,
+                    active: has_content,
+                });
+            }
+        }
+    }
+
+    // Sort alphabetically for consistent display
+    worktrees.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(worktrees)
 }
 
 #[tauri::command]
@@ -227,6 +332,9 @@ fn main() {
             is_pty_active,
             list_active_sessions,
             send_session_notification,
+            open_in_explorer,
+            scan_worktrees,
+            frontend_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
