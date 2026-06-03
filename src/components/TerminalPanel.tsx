@@ -252,14 +252,16 @@ export function TerminalPanel({
       // We intercept onData during composition and only let the final
       // committed text through after compositionend.
       let isComposing = false;
+      let imeSeq = 0;
       const imeTextarea = container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
       if (imeTextarea) {
         imeTextarea.addEventListener("compositionstart", () => {
-          console.log("[IME] compositionstart");
+          imeSeq++;
+          console.log("[IME] #%d compositionstart", imeSeq);
           isComposing = true;
         });
         imeTextarea.addEventListener("compositionend", (e) => {
-          console.log("[IME] compositionend data=%s", e.data);
+          console.log("[IME] #%d compositionend data=%s", imeSeq, e.data);
           isComposing = false;
         });
       }
@@ -278,14 +280,10 @@ export function TerminalPanel({
 
       term.onData((data) => {
         if (isComposing) {
-          console.log("[IME] onData SUPPRESSED %j", data);
+          console.log("[IME] #%d onData SUPPRESSED %j", imeSeq, data);
           return;
         }
-        // Log non-ASCII data to help diagnose IME leak issues
-        const hasNonAscii = data.length > 0 && /[^\x00-\x7F]/.test(data);
-        if (hasNonAscii) {
-          console.log("[IME] onData SEND %j", data);
-        }
+        console.log("[IME] #%d onData >> %j", imeSeq, data);
         api.writePty(session.id, data).catch(() => {
           term.write(data);
         });
