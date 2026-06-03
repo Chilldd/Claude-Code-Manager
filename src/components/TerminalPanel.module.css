@@ -15,17 +15,17 @@
   align-items: stretch;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
-  padding: 0 4px;
-  gap: 2px;
+  padding: 0 6px;
+  gap: 4px;
   flex-shrink: 0;
-  height: 30px;
+  height: 34px;
 }
 
 .groupTab {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
+  gap: 6px;
+  padding: 0 12px;
   font-size: 11px;
   color: var(--text-secondary);
   cursor: pointer;
@@ -106,7 +106,7 @@
 }
 
 .groupAddBtn {
-  width: 24px;
+  width: 28px;
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -130,17 +130,17 @@
   align-items: stretch;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
-  padding: 0 4px;
-  gap: 2px;
+  padding: 0 6px;
+  gap: 4px;
   flex-shrink: 0;
-  height: 28px;
+  height: 32px;
 }
 
 .terminalTab {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 0 8px;
+  gap: 6px;
+  padding: 0 10px;
   font-size: 11px;
   color: var(--text-secondary);
   cursor: pointer;

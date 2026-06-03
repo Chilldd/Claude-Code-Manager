@@ -27,7 +27,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
@@ -47,8 +47,8 @@
 }
 
 .headerBtn {
-  width: 26px;
-  height: 22px;
+  width: 28px;
+  height: 24px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -98,8 +98,8 @@
 .workspaceItem {
   display: flex;
   align-items: center;
-  padding: 6px 8px 6px 4px;
-  gap: 4px;
+  padding: 8px 10px 8px 6px;
+  gap: 6px;
   transition: background 0.12s var(--ease-smooth);
 }
 
@@ -108,8 +108,8 @@
 }
 
 .expandBtn {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -167,8 +167,8 @@
 }
 
 .btnNewSession {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -188,8 +188,8 @@
 }
 
 .btnMore {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -277,8 +277,8 @@
 .sessionItem {
   display: flex;
   align-items: center;
-  padding: 4px 6px;
-  gap: 6px;
+  padding: 6px 8px;
+  gap: 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.12s var(--ease-smooth);
