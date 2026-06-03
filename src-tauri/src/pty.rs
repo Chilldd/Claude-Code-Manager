@@ -26,7 +26,7 @@ pub struct PtyTitlePayload {
     pub title: String,
 }
 
-/// Emitted when a PTY session is created (with detected root PIDs)
+/// Emitted when a PTY session is created
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionCreatedPayload {
     pub session_id: String,
@@ -80,11 +80,32 @@ fn parse_osc_title(data: &[u8]) -> Option<(String, usize)> {
     None
 }
 
-// ── Per-session state (pure PTY, no sysinfo) ──
+/// Parse a command-line string into arguments, respecting shell quoting rules.
+///
+/// This handles single quotes, double quotes, and escaped characters.
+#[cfg(not(test))]
+fn parse_args(input: &str) -> Vec<String> {
+    match shell_words::split(input) {
+        Ok(args) => args,
+        Err(e) => {
+            eprintln!("[pty] Failed to parse args {:?}: {}. Falling back to whitespace split.", input, e);
+            input.split_whitespace().map(|s| s.to_string()).collect()
+        }
+    }
+}
+
+// test-only stub to avoid depending on shell-words in tests
+#[cfg(test)]
+fn parse_args(input: &str) -> Vec<String> {
+    input.split_whitespace().map(|s| s.to_string()).collect()
+}
+
+// ── Per-session state ──
 
 struct PtySession {
     id: String,
     workspace_id: String,
+    name: String,
     child: Option<Box<dyn ChildKiller + Send>>,
     writer: Option<Box<dyn Write + Send>>,
     master: Option<Box<dyn MasterPty + Send>>,
@@ -104,20 +125,19 @@ impl PtyManager {
     }
 
     /// Create a new PTY session.
-    /// Returns (session_id, root_pids) — root PIDs captured at spawn time.
+    /// Returns `(session_id, root_pids)` — root PIDs captured at spawn time.
     pub fn create(
         &mut self,
         window: &WebviewWindow,
         workspace_id: &str,
-        _session_name: &str,
+        session_name: &str,
         command: &str,
         args: &str,
         cwd: &str,
         env: HashMap<String, String>,
     ) -> Result<(String, Vec<u32>), String> {
         let session_id = uuid::Uuid::new_v4().to_string();
-
-        let args: Vec<&str> = args.split_whitespace().filter(|a| !a.is_empty()).collect();
+        let args = parse_args(args);
 
         let pty_system = NativePtySystem::default();
         let pair = pty_system
@@ -181,6 +201,7 @@ impl PtyManager {
         let session = PtySession {
             id: session_id.clone(),
             workspace_id: workspace_id.to_string(),
+            name: session_name.to_string(),
             child: Some(child),
             writer: Some(writer),
             master: Some(pair.master),
@@ -262,43 +283,35 @@ impl PtyManager {
     }
 
     pub fn write(&mut self, session_id: &str, data: &str) -> Result<(), String> {
-        if let Some(session) = self.sessions.get_mut(session_id) {
-            if let Some(writer) = &mut session.writer {
-                writer
-                    .write_all(data.as_bytes())
-                    .map_err(|e| format!("PTY write: {}", e))?;
-                writer
-                    .flush()
-                    .map_err(|e| format!("PTY flush: {}", e))?;
-                Ok(())
-            } else {
-                Err("No active PTY".to_string())
-            }
-        } else {
-            Err("Session not found".to_string())
-        }
+        let session = self.sessions.get_mut(session_id).ok_or_else(|| {
+            format!("Session not found: {}", session_id)
+        })?;
+        let writer = session.writer.as_mut().ok_or("No active PTY")?;
+        writer
+            .write_all(data.as_bytes())
+            .and_then(|_| writer.flush())
+            .map_err(|e| format!("PTY write: {}", e))
     }
 
     pub fn resize(&mut self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
-        if let Some(session) = self.sessions.get(session_id) {
-            if let Some(master) = &session.master {
-                master
-                    .resize(PtySize {
-                        rows,
-                        cols,
-                        pixel_width: 0,
-                        pixel_height: 0,
-                    })
-                    .map_err(|e| format!("PTY resize: {}", e))
-            } else {
-                Ok(())
-            }
+        let session = self.sessions.get(session_id).ok_or_else(|| {
+            format!("Session not found: {}", session_id)
+        })?;
+        if let Some(master) = &session.master {
+            master
+                .resize(PtySize {
+                    rows,
+                    cols,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+                .map_err(|e| format!("PTY resize: {}", e))
         } else {
-            Err("Session not found".to_string())
+            Ok(())
         }
     }
 
-    /// Kill a specific session. Returns the session_id if found.
+    /// Kill a specific session. Returns `true` if a session was found.
     pub fn kill(&mut self, session_id: &str) -> bool {
         if let Some(mut session) = self.sessions.remove(session_id) {
             if let Some(mut child) = session.child.take() {
@@ -322,26 +335,13 @@ impl PtyManager {
             .map(|s| SessionInfo {
                 id: s.id.clone(),
                 workspace_id: s.workspace_id.clone(),
-                name: String::new(),
+                name: s.name.clone(),
             })
             .collect()
     }
 
     pub fn kill_all(&mut self) {
         let ids: Vec<String> = self.sessions.keys().cloned().collect();
-        for id in &ids {
-            self.kill(&id);
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn kill_workspace(&mut self, workspace_id: &str) {
-        let ids: Vec<String> = self
-            .sessions
-            .iter()
-            .filter(|(_, s)| s.workspace_id == workspace_id)
-            .map(|(k, _)| k.clone())
-            .collect();
         for id in &ids {
             self.kill(&id);
         }
@@ -356,7 +356,6 @@ impl Drop for PtyManager {
 
 /// Snapshot child PIDs of our process right now.
 /// Used at spawn time to detect what was just launched.
-/// This is the only place we touch sysinfo in the PTY layer — a one-shot probe.
 pub fn detect_our_child_pids() -> Vec<u32> {
     let mut sys = sysinfo::System::new();
     sys.refresh_processes(ProcessesToUpdate::All);
@@ -384,4 +383,25 @@ pub fn detect_our_child_pids() -> Vec<u32> {
     }
 
     all
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_osc_title_bel() {
+        let data = b"hello\x1b]0;my title\x07world";
+        let (title, end) = parse_osc_title(data).unwrap();
+        assert_eq!(title, "my title");
+        assert_eq!(&data[end..], b"world");
+    }
+
+    #[test]
+    fn test_parse_osc_title_st() {
+        let data = b"hello\x1b]2;tab title\x1b\\world";
+        let (title, end) = parse_osc_title(data).unwrap();
+        assert_eq!(title, "tab title");
+        assert_eq!(&data[end..], b"world");
+    }
 }
