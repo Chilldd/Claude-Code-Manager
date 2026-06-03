@@ -33,13 +33,14 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
 .sidebarToggle {
   position: absolute;
   left: 280px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) translateX(0);
   z-index: 50;
   width: 20px;
   height: 40px;
@@ -52,7 +53,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: left 0.25s var(--ease-out-expo);
+  transition: transform 0.25s var(--ease-out-expo);
 }
 
 .sidebarToggle:hover {
@@ -61,5 +62,5 @@
 }
 
 .sidebarToggle.collapsed {
-  left: 0;
+  transform: translateY(-50%) translateX(-280px);
 }

@@ -2,25 +2,22 @@
    WORKSPACE PANEL (from App.css section 3)
    ====================================================== */
 .panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
   width: 280px;
-  min-width: 220px;
-  max-width: 360px;
+  z-index: 10;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: visible;
-  animation: slideInLeft 0.35s var(--ease-out-expo);
-  transition: width 0.25s var(--ease-out-expo), min-width 0.25s var(--ease-out-expo), opacity 0.2s var(--ease-smooth), border-color 0.25s var(--ease-out-expo);
+  transition: transform 0.25s var(--ease-out-expo);
 }
 
 .panel.collapsed {
-  width: 0 !important;
-  min-width: 0 !important;
-  max-width: 0 !important;
-  overflow: hidden;
-  border-right: none;
-  opacity: 0;
+  transform: translateX(-100%);
 }
 
 .header {
