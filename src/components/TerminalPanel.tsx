@@ -339,7 +339,7 @@ export function TerminalPanel() {
     }, 0);
   }, [sessions, activeGroupSessions, selectedSessionId, splitMode]);
 
-  // ── Refit on container resize (brief debounce ~50ms) ──
+  // ── Refit on container resize (debounce > sidebar transition 250ms) ──
   useEffect(() => {
     const root = containerRootRef.current;
     if (!root) return;
@@ -353,7 +353,7 @@ export function TerminalPanel() {
           ? allIds
           : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
         refitVisible(ids, termInstancesRef.current);
-      }, 50);
+      }, 350);
     });
     observer.observe(root);
     return () => {
