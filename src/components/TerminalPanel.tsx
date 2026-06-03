@@ -339,26 +339,27 @@ export function TerminalPanel() {
     }, 0);
   }, [sessions, activeGroupSessions, selectedSessionId, splitMode]);
 
-  // ── Refit on container resize ──
+  // ── Refit on container resize (rAF-throttled, no visual lag) ──
   useEffect(() => {
     const root = containerRootRef.current;
     if (!root) return;
 
-    let debounceId: ReturnType<typeof setTimeout>;
+    let rafId = 0;
     const observer = new ResizeObserver(() => {
-      clearTimeout(debounceId);
-      debounceId = setTimeout(() => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
         const allIds = activeGroupSessions.map((s) => s.id);
         const ids = splitMode
           ? allIds
           : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
         refitVisible(ids, termInstancesRef.current);
-      }, 300);
+      });
     });
     observer.observe(root);
     return () => {
       observer.disconnect();
-      clearTimeout(debounceId);
+      if (rafId) cancelAnimationFrame(rafId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroupSessions.length, splitMode, selectedSessionId]);
