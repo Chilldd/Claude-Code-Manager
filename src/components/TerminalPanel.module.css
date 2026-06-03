@@ -15,7 +15,6 @@
   align-items: stretch;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
-  padding: 0 6px;
   gap: 4px;
   flex-shrink: 0;
   height: 34px;
@@ -130,7 +129,6 @@
   align-items: stretch;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
-  padding: 0 6px;
   gap: 4px;
   flex-shrink: 0;
   height: 32px;

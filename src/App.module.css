@@ -41,7 +41,7 @@
   width: 20px;
   background: var(--bg-surface);
   border: none;
-  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   color: var(--text-muted);
   cursor: pointer;
   display: flex;

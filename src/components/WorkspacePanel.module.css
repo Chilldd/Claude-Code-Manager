@@ -2,7 +2,7 @@
    WORKSPACE PANEL (from App.css section 3)
    ====================================================== */
 .panel {
-  width: 280px;
+  width: 260px;
   min-width: 220px;
   max-width: 360px;
   background: var(--bg-surface);
