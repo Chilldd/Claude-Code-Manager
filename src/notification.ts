@@ -1,8 +1,8 @@
 /**
  * Windows 系统通知封装
  *
- * 基于 Tauri v1 的 notification API，提供简洁的通用接口。
- * 使用前确保 tauri.conf.json 的 allowlist 中包含：
+ * 基于 Tauri v2 的 @tauri-apps/plugin-notification API，提供简洁的通用接口。
+ * 使用前确保在 tauri.conf.json 的 plugins 中配置：
  *   "notification": { "all": true }
  */
 

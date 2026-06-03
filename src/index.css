@@ -1,67 +1,7 @@
 /* ══════════════════════════════════════════════════
-   Windows Terminal "Dark+" Theme — Base Layer
+   Theme — CSS Custom Properties (dark / light)
    ══════════════════════════════════════════════════ */
-
-:root {
-  /* ── Background layers (WT deep black → elevated) ── */
-  --bg-base: #0c0c0c;
-  --bg-surface: #141414;
-  --bg-elevated: #1c1c1c;
-  --bg-hover: #252525;
-  --bg-active: #2d2d2d;
-
-  /* ── Acrylic / glass simulation ── */
-  --acrylic-bg: rgba(18, 18, 18, 0.82);
-  --acrylic-border: rgba(255, 255, 255, 0.05);
-  --acrylic-shimmer: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.02) 0%,
-    rgba(96, 205, 255, 0.03) 50%,
-    rgba(255, 255, 255, 0.01) 100%
-  );
-
-  /* ── Text ── */
-  --text-primary: #e8e8e8;
-  --text-secondary: #9d9d9d;
-  --text-muted: #5e5e5e;
-  --text-dim: #3e3e3e;
-
-  /* ── Borders ── */
-  --border: #383838;
-  --border-subtle: #252525;
-  --border-acrylic: rgba(255, 255, 255, 0.06);
-
-  /* ── Accent (Windows 11 blue) ── */
-  --accent: #60cdff;
-  --accent-hover: #7ad5ff;
-  --accent-dim: rgba(96, 205, 255, 0.12);
-  --accent-glow: rgba(96, 205, 255, 0.25);
-
-  /* ── Status ── */
-  --success: #6a9955;
-  --warning: #d7ba7d;
-  --danger: #f44747;
-  --danger-dim: rgba(244, 71, 71, 0.12);
-
-  /* ── Fonts ── */
-  --font-ui: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Cascadia Code', 'Cascadia Mono', 'Consolas', 'Courier New', monospace;
-
-  /* ── Radii ── */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-
-  /* ── Shadows ── */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
-
-  /* ── Transitions ── */
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-}
+@import "./styles/themes.css";
 
 /* ── Reset ── */
 *,
@@ -146,4 +86,132 @@ body {
 @keyframes tabAppear {
   from { opacity: 0; transform: translateX(-6px); }
   to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Shared component styles (used by multiple components) ── */
+
+/* Buttons */
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  padding: 6px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-smooth);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.btn-secondary:hover {
+  background: var(--bg-active);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+  font-weight: 600;
+}
+.btn-danger:hover {
+  opacity: 0.85;
+}
+
+/* Dialog shared styles */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.15s var(--ease-smooth);
+}
+
+.dialog {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  min-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.dialog form label {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dialog form input,
+.dialog form textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s var(--ease-smooth);
+}
+
+.dialog form input:focus,
+.dialog form textarea:focus {
+  border-color: var(--accent);
+}
+
+.dialog form textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Confirm dialog shared styles */
+.dialog-confirm .confirm-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.dialog-confirm .confirm-text code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-hover);
+  padding: 1px 5px;
+  border-radius: 3px;
 }

@@ -1,0 +1,49 @@
+/*
+  Global styles for xterm DOM-manipulated classes.
+  These cannot live in CSS Modules because they are applied
+  programmatically via DOM APIs in TerminalPanel.tsx.
+*/
+
+.term-instance {
+  display: none; /* hidden by default; shown via layout logic */
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.term-instance.active {
+  display: block;
+}
+
+/* IME composition guard overlay on inactive terminals */
+.term-ime-guard {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: pointer;
+}
+
+/* Terminal container layout */
+.terminal-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  min-height: 0;
+}
+
+.terminal-container.split-mode {
+  display: grid;
+  gap: 2px;
+  background: var(--bg-surface);
+  padding: 2px;
+}
+
+/* xterm overrides */
+.xterm {
+  height: 100%;
+  padding: 4px;
+}
+
+.xterm-viewport {
+  scrollbar-width: thin;
+}

@@ -28,11 +28,13 @@ export interface PtyTitleEvent {
   title: string;
 }
 
-export interface SessionInfo {
+export interface BackendSessionInfo {
   id: string;
   workspace_id: string;
   name: string;
 }
+
+export type SessionBackendState = "created" | "running" | "busy" | "idle" | "zombie" | "exited";
 
 // ── Metrics event types (event-driven, no polling) ──
 
@@ -76,7 +78,7 @@ export interface ProcessesDiffPayload {
 
 export interface SessionStatePayload {
   session_id: string;
-  state: string; // "created" | "running" | "idle" | "busy" | "zombie" | "exited"
+  state: SessionBackendState;
 }
 
 // ── API commands ──
@@ -103,7 +105,7 @@ export const api = {
   isPtyActive: (sessionId: string) =>
     invoke<boolean>("is_pty_active", { sessionId }),
   listActiveSessions: () =>
-    invoke<SessionInfo[]>("list_active_sessions"),
+    invoke<BackendSessionInfo[]>("list_active_sessions"),
 
   /** Send a native notification with click-to-activate. Click opens the app via deep-link protocol. */
   sendSessionNotification: (sessionId: string, title: string, body: string) =>

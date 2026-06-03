@@ -13,7 +13,8 @@ import type {
   ProcessNode,
   FlatProcessInfo,
 } from "../api";
-import type { SessionInfo } from "../App";
+import type { SessionInfo } from "../types";
+import styles from "./PerformancePanel.module.css";
 
 interface Props {
   sessions: SessionInfo[];
@@ -201,115 +202,115 @@ export function PerformancePanel({ sessions }: Props) {
   ).length;
 
   return (
-    <div className="perf-panel">
-      <div className="perf-header">
+    <div className={styles.panel}>
+      <div className={styles.header}>
         <h2>⚡ Performance</h2>
-        <span className="perf-subtitle">
+        <span className={styles.subtitle}>
           Event-driven · Process Graph · Session State Machine
         </span>
       </div>
 
       {/* ── System Overview Cards ── */}
-      <div className="perf-cards">
+      <div className={styles.cards}>
         {/* CPU */}
-        <div className="perf-card">
-          <div className="perf-card-header">
-            <span className="perf-card-icon">
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardIcon}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <rect x="2" y="2" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
                 <circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.5" />
               </svg>
             </span>
-            <span className="perf-card-title">CPU</span>
+            <span className={styles.cardTitle}>CPU</span>
           </div>
-          <div className="perf-card-value" data-color="accent">
+          <div className={styles.cardValue} data-color="accent">
             {sysStats ? `${sysStats.cpu_percent.toFixed(1)}%` : "—"}
           </div>
-          <div className="perf-bar-track">
-            <div className="perf-bar-fill cpu" style={{ width: sysStats ? `${Math.min(sysStats.cpu_percent, 100)}%` : "0%" }} />
+          <div className={styles.barTrack}>
+            <div className={`${styles.barFill} ${styles.cpu}`} style={{ width: sysStats ? `${Math.min(sysStats.cpu_percent, 100)}%` : "0%" }} />
           </div>
         </div>
 
         {/* Memory */}
-        <div className="perf-card">
-          <div className="perf-card-header">
-            <span className="perf-card-icon">
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardIcon}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <rect x="1" y="4" width="16" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
                 <rect x="3" y="6" width="2" height="6" rx="0.5" fill="currentColor" opacity="0.5" />
               </svg>
             </span>
-            <span className="perf-card-title">Memory</span>
+            <span className={styles.cardTitle}>Memory</span>
           </div>
-          <div className="perf-card-value" data-color="green">
+          <div className={styles.cardValue} data-color="green">
             {sysStats ? `${sysStats.memory_used_gb.toFixed(1)} / ${sysStats.memory_total_gb.toFixed(0)} GB` : "—"}
           </div>
-          <div className="perf-bar-track">
-            <div className="perf-bar-fill memory" style={{ width: sysStats ? `${Math.min(sysStats.memory_percent, 100)}%` : "0%" }} />
+          <div className={styles.barTrack}>
+            <div className={`${styles.barFill} ${styles.memory}`} style={{ width: sysStats ? `${Math.min(sysStats.memory_percent, 100)}%` : "0%" }} />
           </div>
-          <span className="perf-bar-label">{sysStats ? `${sysStats.memory_percent.toFixed(1)}% used` : ""}</span>
+          <span className={styles.barLabel}>{sysStats ? `${sysStats.memory_percent.toFixed(1)}% used` : ""}</span>
         </div>
 
         {/* Sessions */}
-        <div className="perf-card">
-          <div className="perf-card-header">
-            <span className="perf-card-icon">
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardIcon}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <rect x="1.5" y="1.5" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
                 <rect x="10.5" y="10.5" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
               </svg>
             </span>
-            <span className="perf-card-title">Sessions</span>
+            <span className={styles.cardTitle}>Sessions</span>
           </div>
-          <div className="perf-card-value" data-color="yellow">
+          <div className={styles.cardValue} data-color="yellow">
             {sessions.length}
           </div>
-          <div className="perf-card-sub">
+          <div className={styles.cardSub}>
             {activeCount} active · {agg.totalCount} processes
           </div>
         </div>
 
         {/* Terminal Resources */}
-        <div className="perf-card">
-          <div className="perf-card-header">
-            <span className="perf-card-icon">
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardIcon}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <polyline points="2,14 7,9 10,12 16,5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </span>
-            <span className="perf-card-title">Terminal Resources</span>
+            <span className={styles.cardTitle}>Terminal Resources</span>
           </div>
-          <div className="perf-card-value" data-color="accent" style={{ fontSize: "20px" }}>
+          <div className={styles.cardValue} data-color="accent" style={{ fontSize: "20px" }}>
             {agg.totalCpu.toFixed(1)}% CPU
           </div>
-          <div className="perf-card-sub">
+          <div className={styles.cardSub}>
             {agg.totalMemMb.toFixed(1)} MB memory · {agg.totalCount} tracked PIDs
           </div>
         </div>
       </div>
 
       {/* ── Process Graph Section (collapsible, default collapsed) ── */}
-      <div className="perf-section">
+      <div className={styles.section}>
         <div
-          className="perf-section-header collapsible"
+          className={`${styles.sectionHeader} ${styles.collapsible}`}
           onClick={() => setShowProcessTree((v) => !v)}
         >
-          <span className="perf-collapse-icon">{showProcessTree ? "▼" : "▶"}</span>
-          <h3 className="perf-section-title">
+          <span className={styles.collapseIcon}>{showProcessTree ? "▼" : "▶"}</span>
+          <h3 className={styles.sectionTitle}>
             Process Graph
-            <span className="perf-section-badge">
+            <span className={styles.sectionBadge}>
               {sessions.length} session{sessions.length !== 1 ? "s" : ""}
             </span>
-            <span className="perf-section-badge dim">
+            <span className={`${styles.sectionBadge} ${styles.dim}`}>
               {agg.totalCount} processes
             </span>
           </h3>
         </div>
 
         {showProcessTree && (
-          <div className="perf-session-tree-list">
+          <div className={styles.sessionTreeList}>
             {sessions.length === 0 ? (
-              <div className="perf-empty">
+              <div className={styles.empty}>
                 <p>No active sessions. Launch a workspace to see the process tree.</p>
               </div>
             ) : (
@@ -323,20 +324,20 @@ export function PerformancePanel({ sessions }: Props) {
                 const sessCount = sessionRows.length;
 
                 return (
-                  <div key={session.id} className="perf-session-tree">
+                  <div key={session.id} className={styles.sessionTree}>
                     <div
-                      className="perf-session-tree-header"
+                      className={styles.sessionTreeHeader}
                       onClick={() => toggleSessionExpanded(session.id)}
                     >
-                      <span className="perf-collapse-icon">
+                      <span className={styles.collapseIcon}>
                         {isExpanded ? "▼" : "▶"}
                       </span>
-                      <span className={`perf-session-dot ${state}`} />
-                      <span className="perf-session-tree-name">
+                      <span className={`${styles.sessionDot} ${styles[state as keyof typeof styles] || ''}`} />
+                      <span className={styles.sessionTreeName}>
                         {session.name}
                       </span>
-                      <span className={`perf-state-pill ${state}`}>{state}</span>
-                      <span className="perf-session-tree-summary">
+                      <span className={`${styles.statePill} ${styles[state as keyof typeof styles] || ''}`}>{state}</span>
+                      <span className={styles.sessionTreeSummary}>
                         {sessCount} proc · {sessCpu.toFixed(1)}% CPU ·{" "}
                         {sessMem > 100 * 1024 * 1024
                           ? `${(sessMem / (1024 * 1024 * 1024)).toFixed(2)} GB`
@@ -345,47 +346,47 @@ export function PerformancePanel({ sessions }: Props) {
                     </div>
 
                     {isExpanded && sessionRows.length > 0 && (
-                      <div className="perf-table-wrap">
-                        <table className="perf-table">
+                      <div className={styles.tableWrap}>
+                        <table className={styles.table}>
                           <thead>
                             <tr>
                               <th>Process Tree</th>
                               <th>PID</th>
-                              <th className="perf-num">CPU%</th>
-                              <th className="perf-num">Memory</th>
+                              <th className={styles.perfNum}>CPU%</th>
+                              <th className={styles.perfNum}>Memory</th>
                               <th>State</th>
                             </tr>
                           </thead>
                           <tbody>
                             {sessionRows.map((row) => (
                               <tr key={`${session.id}-${row.pid}`}>
-                                <td className="perf-mono perf-tree-cell">
+                                <td className={`${styles.perfMono} ${styles.treeCell}`}>
                                   <span
-                                    className="perf-tree-indent"
+                                    className={styles.treeIndent}
                                     style={{ paddingLeft: `${row.depth * 20}px` }}
                                   />
                                   {row.depth > 0 && (
-                                    <span className="perf-tree-branch">
+                                    <span className={styles.treeBranch}>
                                       {row.has_children ? "└─ " : "· "}
                                     </span>
                                   )}
                                   {row.name}
                                 </td>
-                                <td className="perf-mono">{row.pid}</td>
-                                <td className="perf-num">
+                                <td className={styles.perfMono}>{row.pid}</td>
+                                <td className={styles.perfNum}>
                                   <span
-                                    className={`perf-cpu-badge ${row.cpu_percent > 50 ? "high" : row.cpu_percent > 10 ? "med" : ""}`}
+                                    className={`${styles.cpuBadge} ${row.cpu_percent > 50 ? styles.high : row.cpu_percent > 10 ? styles.med : ''}`}
                                   >
                                     {row.cpu_percent.toFixed(1)}%
                                   </span>
                                 </td>
-                                <td className="perf-num perf-mono">
+                                <td className={`${styles.perfNum} ${styles.perfMono}`}>
                                   {row.memory_bytes > 100 * 1024 * 1024
                                     ? `${(row.memory_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
                                     : `${(row.memory_bytes / (1024 * 1024)).toFixed(1)} MB`}
                                 </td>
-                                <td className="perf-mono">
-                                  <span className={`perf-state-tag ${row.state.toLowerCase()}`}>
+                                <td className={styles.perfMono}>
+                                  <span className={`${styles.stateTag} ${styles[row.state.toLowerCase() as keyof typeof styles] || ''}`}>
                                     {row.state}
                                   </span>
                                 </td>
