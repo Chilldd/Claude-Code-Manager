@@ -280,10 +280,10 @@ export function TerminalPanel({
 
       term.onData((data) => {
         if (isComposing) {
-          console.log("[IME] #%d onData SUPPRESSED %j", imeSeq, data);
+          console.log("[IME] #%d onData SUPPRESSED %s", imeSeq, data);
           return;
         }
-        console.log("[IME] #%d onData >> %j", imeSeq, data);
+        console.log("[IME] #%d onData >> %s", imeSeq, data);
         api.writePty(session.id, data).catch(() => {
           term.write(data);
         });
