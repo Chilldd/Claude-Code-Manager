@@ -253,11 +253,20 @@ export function TerminalPanel({
       // committed text through after compositionend.
       let isComposing = false;
       let imeSeq = 0;
+      // Ring buffer: keep last 5 onData calls so we can dump what was sent
+      // just before compositionstart (the likely leak window).
+      const onDataRingBuf: string[] = [];
       const imeTextarea = container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
       if (imeTextarea) {
         imeTextarea.addEventListener("compositionstart", () => {
           imeSeq++;
           console.log("[IME] #%d compositionstart", imeSeq);
+          // Dump ring buffer: show what data was sent right before
+          // (first character of pinyin often leaks here)
+          if (onDataRingBuf.length > 0) {
+            console.log("[IME] #%d PRE-start data: %s", imeSeq, onDataRingBuf.join(" "));
+            onDataRingBuf.length = 0;
+          }
           isComposing = true;
         });
         imeTextarea.addEventListener("compositionend", (e) => {
@@ -280,10 +289,20 @@ export function TerminalPanel({
 
       term.onData((data) => {
         if (isComposing) {
-          console.log("[IME] #%d onData SUPPRESSED %s", imeSeq, data);
+          // Intermediate IME data that we successfully blocked
+          console.log("[IME] #%d BLOCKED", imeSeq, data);
           return;
         }
-        console.log("[IME] #%d onData >> %s", imeSeq, data);
+        // If composition just ended, the committed text arrives now
+        // via the normal onData path.  Log it for confirmation.
+        const justEnded = imeSeq > 0;
+        if (justEnded && data.length > 0) {
+          console.log("[IME] #%d COMMIT", imeSeq, data);
+        }
+        // Keep ring buffer (sliding window of last 5) so we can see
+        // what was sent moments before compositionstart.
+        onDataRingBuf.push(data);
+        if (onDataRingBuf.length > 5) onDataRingBuf.shift();
         api.writePty(session.id, data).catch(() => {
           term.write(data);
         });
