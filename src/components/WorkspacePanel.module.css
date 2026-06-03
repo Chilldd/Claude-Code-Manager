@@ -13,11 +13,13 @@
   display: flex;
   flex-direction: column;
   overflow: visible;
+  pointer-events: auto;
   transition: transform 0.25s var(--ease-out-expo);
 }
 
 .panel.collapsed {
   transform: translateX(-100%);
+  pointer-events: none;
 }
 
 .header {
