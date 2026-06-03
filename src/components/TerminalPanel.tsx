@@ -289,15 +289,13 @@ export function TerminalPanel({
 
       term.onData((data) => {
         if (isComposing) {
-          // Intermediate IME data that we successfully blocked
           console.log("[IME] #%d BLOCKED", imeSeq, data);
           return;
         }
-        // If composition just ended, the committed text arrives now
-        // via the normal onData path.  Log it for confirmation.
-        const justEnded = imeSeq > 0;
-        if (justEnded && data.length > 0) {
+        // First onData after compositionend = the committed text
+        if (imeSeq > 0) {
           console.log("[IME] #%d COMMIT", imeSeq, data);
+          imeSeq = 0; // reset so subsequent data doesn't get COMMIT label
         }
         // Keep ring buffer (sliding window of last 5) so we can see
         // what was sent moments before compositionstart.
