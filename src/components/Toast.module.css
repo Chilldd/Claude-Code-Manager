@@ -1,0 +1,55 @@
+/* ======================================================
+   TOAST (from App.css section 6)
+   ====================================================== */
+.toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 2000;
+  animation: slideInUp 0.25s var(--ease-out-expo);
+  box-shadow: var(--shadow-md);
+  max-width: 500px;
+}
+
+.toast.error {
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
+.toast.info {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.toast button {
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.12s var(--ease-smooth);
+  flex-shrink: 0;
+}
+
+.toast.error button:hover {
+  background: var(--danger);
+  color: white;
+}
+
+.toast.info button:hover {
+  background: var(--accent);
+  color: #000;
+}

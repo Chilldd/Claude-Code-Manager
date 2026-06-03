@@ -1,0 +1,65 @@
+/* ======================================================
+   APP LAYOUT (from App.css section 2)
+   ====================================================== */
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+}
+
+.appLoading {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  gap: 10px;
+}
+
+.appLoading::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.appLayout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebarToggle {
+  position: absolute;
+  left: 280px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  width: 20px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: left 0.25s var(--ease-out-expo);
+}
+
+.sidebarToggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sidebarToggle.collapsed {
+  left: 0;
+}

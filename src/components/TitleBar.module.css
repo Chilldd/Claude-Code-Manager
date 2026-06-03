@@ -1,0 +1,136 @@
+/* ======================================================
+   TITLE BAR (from App.css section 1)
+   ====================================================== */
+.titlebar {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 0 0 12px;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+}
+
+.titlebarLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.titlebarCenter {
+  flex: 1;
+  height: 100%;
+}
+
+.titlebarIcon {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.titlebarText {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.titlebarRight {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 0;
+}
+
+.titlebarBtn {
+  width: 30px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s var(--ease-smooth);
+  font-size: 16px;
+  line-height: 1;
+  margin-right: 4px;
+}
+
+.titlebarBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.titlebarBtn.primary {
+  color: var(--accent);
+}
+.titlebarBtn.primary:hover {
+  background: var(--accent-dim);
+}
+
+/* ── View Toggle ── */
+.viewToggle {
+  width: 30px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s var(--ease-smooth);
+  margin-right: 2px;
+}
+
+.viewToggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.viewToggle.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.titlebarSep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ── Window Controls (min/max/close) ── */
+.winBtn {
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s var(--ease-smooth);
+}
+
+.winBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.winBtnClose:hover {
+  background: var(--danger);
+  color: white;
+}
