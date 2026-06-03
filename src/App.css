@@ -879,13 +879,6 @@
   overflow: hidden !important;
 }
 
-/* Hide xterm's composition view — redundant with the OS IME candidate
-   window, and its position can appear outside Claude Code's input box
-   during split-screen or after cursor moves. */
-.terminal-container .composition-view {
-  display: none !important;
-}
-
 /* ── Terminal Instance (each session's terminal wrapper) ── */
 .term-instance {
   width: 100%;

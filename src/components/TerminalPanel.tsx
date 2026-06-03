@@ -336,24 +336,16 @@ export function TerminalPanel({
       if (selectedSessionId) {
         const inst = instances.get(selectedSessionId);
         if (inst) {
-          // Focus the active terminal so xterm renders a blinking cursor.
-          // Use requestAnimationFrame to ensure the browser has finished
-          // the layout pass (display:block, grid, IME-guard removal) before
-          // attempting focus - setTimeout-based retries could fire mid-layout.
-          const doFocus = () => {
+          inst.term.focus();
+          // After layout changes settle, retry focus to handle cases where the
+          // first attempt landed before the browser finished display:block/grid
+          // changes — an rAF fires after paint, guaranteeing the textarea is
+          // visible and focusable.
+          requestAnimationFrame(() => {
             if (!inst.container.isConnected) return;
             const ta = inst.container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
             if (ta) ta.focus();
             inst.term.focus();
-            // Force a refresh of the cursor row so xterm re-evaluates
-            // cursorBlink & cursorStyle with the now-focused state.
-            inst.term.refresh(inst.term.buffer.active.cursorY, inst.term.buffer.active.cursorY);
-          };
-          requestAnimationFrame(() => {
-            doFocus();
-            // Retry once more after the next frame in case the first
-            // attempt fired before the document was fully focused.
-            requestAnimationFrame(doFocus);
           });
         }
       }
