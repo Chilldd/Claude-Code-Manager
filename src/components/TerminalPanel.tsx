@@ -246,13 +246,15 @@ export function TerminalPanel({
       term.loadAddon(fitAddon);
       term.open(container);
 
-      // Fix IME composition: position xterm's hidden helper textarea at
-      // the terminal cursor during composition so the native IME candidate
-      // window appears at the right place.  We use .xterm-screen for cell
-      // dimensions since it excludes padding.
+      // Fix IME composition: keep xterm's hidden helper textarea at the
+      // terminal cursor position at ALL times (not just on compositionstart).
+      // This way the native IME candidate window always appears at the right
+      // place regardless of split-screen mode - the browser reads the textarea
+      // position synchronously when IME activates, so lazy positioning on
+      // compositionstart is too late.
       const imeTextarea = container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
       if (imeTextarea) {
-        const moveToCursor = () => {
+        const syncTextareaToCursor = () => {
           const termEl = term.element;
           const screen = termEl?.querySelector<HTMLDivElement>(".xterm-screen");
           if (!screen) return;
@@ -266,11 +268,21 @@ export function TerminalPanel({
           imeTextarea.style.top = `${sr.top + cy * cellH}px`;
         };
 
-        imeTextarea.addEventListener("compositionstart", moveToCursor);
+        // Sync textarea to cursor on every cursor move so the IME candidate
+        // window always appears at the right position.
+        term.onCursorMove(syncTextareaToCursor);
+        // Also sync once immediately since onCursorMove may not fire
+        // until the cursor actually moves.
+        syncTextareaToCursor();
+
+        imeTextarea.addEventListener("compositionstart", () => {
+          // Hide cursor during IME composition — the candidate window
+          // serves as the visual feedback, not the terminal cursor.
+          term.options.cursorStyle = "none";
+        });
         imeTextarea.addEventListener("compositionend", () => {
-          imeTextarea.style.position = "absolute";
-          imeTextarea.style.left = "-9999px";
-          imeTextarea.style.top = "-9999px";
+          term.options.cursorStyle = "bar";
+          term.options.cursorBlink = true;
         });
       }
 
@@ -364,16 +376,25 @@ export function TerminalPanel({
       if (selectedSessionId) {
         const inst = instances.get(selectedSessionId);
         if (inst) {
-          inst.term.focus();
-          const retryFocus = (delay: number) =>
-            setTimeout(() => {
-              if (!inst.container.isConnected) return;
-              const ta = inst.container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
-              if (ta) { ta.focus(); inst.term.focus(); }
-              else inst.term.focus();
-            }, delay);
-          retryFocus(100);
-          retryFocus(400);
+          // Focus the active terminal so xterm renders a blinking cursor.
+          // Use requestAnimationFrame to ensure the browser has finished
+          // the layout pass (display:block, grid, IME-guard removal) before
+          // attempting focus - setTimeout-based retries could fire mid-layout.
+          const doFocus = () => {
+            if (!inst.container.isConnected) return;
+            const ta = inst.container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
+            if (ta) ta.focus();
+            inst.term.focus();
+            // Force a refresh of the cursor row so xterm re-evaluates
+            // cursorBlink & cursorStyle with the now-focused state.
+            inst.term.refresh(inst.term.buffer.active.cursorY, inst.term.buffer.active.cursorY);
+          };
+          requestAnimationFrame(() => {
+            doFocus();
+            // Retry once more after the next frame in case the first
+            // attempt fired before the document was fully focused.
+            requestAnimationFrame(doFocus);
+          });
         }
       }
     } else {
