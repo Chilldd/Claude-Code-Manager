@@ -55,6 +55,7 @@
   max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1;
 }
 
 .tabBadge {
@@ -194,6 +195,7 @@
 .tabLabel {
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1;
 }
 
 .tabClose {

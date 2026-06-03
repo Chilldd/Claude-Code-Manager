@@ -64,6 +64,7 @@
   letter-spacing: 0.04em;
   color: var(--text-secondary);
   font-weight: 600;
+  line-height: 1;
 }
 
 .cardValue {
@@ -161,6 +162,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  line-height: 1;
 }
 
 .sectionBadge {
@@ -171,6 +173,7 @@
   background: var(--bg-hover);
   color: var(--text-muted);
   font-family: var(--font-mono);
+  line-height: 1;
 }
 
 .sectionBadge.dim {
@@ -240,6 +243,7 @@
   font-size: 12px;
   color: var(--text-primary);
   font-family: var(--font-mono);
+  line-height: 1;
 }
 
 .statePill {
@@ -250,6 +254,7 @@
   color: var(--text-muted);
   font-family: var(--font-mono);
   text-transform: capitalize;
+  line-height: 1;
 }
 
 .statePill.created,
@@ -274,6 +279,7 @@
   color: var(--text-muted);
   font-family: var(--font-mono);
   white-space: nowrap;
+  line-height: 1;
 }
 
 /* ── Table ── */

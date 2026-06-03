@@ -38,6 +38,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-secondary);
+  line-height: 1;
 }
 
 .headerActions {
@@ -145,6 +146,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1;
 }
 
 .workspacePath {
@@ -154,6 +156,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--font-mono);
+  line-height: 1;
 }
 
 .workspaceActions {
@@ -235,6 +238,7 @@
   color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: 12px;
+  line-height: 1;
   cursor: pointer;
   transition: background 0.1s var(--ease-smooth);
 }
@@ -260,7 +264,7 @@
 
 /* ── Session sub-list ── */
 .sessionList {
-  padding: 0 0 4px 22px;
+  padding: 0 0 0 22px;
 }
 
 .sessionEmpty {
@@ -325,6 +329,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1;
 }
 
 .sessionStop {

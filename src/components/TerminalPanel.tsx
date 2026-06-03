@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import { api, onPtyOutput, onPtyExit } from "../api";
@@ -8,6 +8,7 @@ import "xterm/css/xterm.css";
 import "../styles/terminal-global.css";
 import { GroupTabs } from "./GroupTabs";
 import { SessionTabs } from "./SessionTabs";
+import { ConfirmDialog } from "./ConfirmDialog";
 import styles from "./TerminalPanel.module.css";
 
 /* ── Windows Terminal "Dark+" (Campbell) color scheme ── */
@@ -110,6 +111,15 @@ export function TerminalPanel() {
   const [splitModes, setSplitModes] = useState<Record<string, boolean>>({});
   const splitMode = splitModes[activeGroupId] ?? true;
 
+  // ── Group delete confirmation ──
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<string | null>(null);
+  const handleConfirmDeleteGroup = useCallback(() => {
+    if (confirmDeleteGroupId) {
+      deleteGroup(confirmDeleteGroupId);
+      setConfirmDeleteGroupId(null);
+    }
+  }, [confirmDeleteGroupId, deleteGroup]);
+
   // ── Session navigation via Ctrl+Arrow / Ctrl+Tab ──
   const switchSessionRef = useRef<((dir: "prev" | "next") => void) | null>(null);
   switchSessionRef.current = (dir) => {
@@ -158,12 +168,15 @@ export function TerminalPanel() {
     };
   }, []);
 
-  // ── Session lifecycle: create/destroy xterm instances ──
-  useEffect(() => {
+  // ── Unified layout: sync xterm instances + compute grid + refit ──
+  // Single entry point for: sessions add/remove, group switch,
+  // session selection, split mode toggle.
+  useLayoutEffect(() => {
     const instances = termInstancesRef.current;
     const root = containerRootRef.current;
     if (!root) return;
 
+    // ── 1. Sync xterm instances with sessions ──
     for (const [sid, inst] of instances) {
       if (!sessions.some((s) => s.id === sid)) {
         inst.term.dispose();
@@ -248,14 +261,8 @@ export function TerminalPanel() {
         pendingOutputRef.current.delete(session.id);
       }
     }
-  }, [sessions]);
 
-  // ── Apply layout: show active group's sessions in grid ──
-  const applyLayout = useCallback(() => {
-    const instances = termInstancesRef.current;
-    const root = containerRootRef.current;
-    if (!root) return;
-
+    // ── 2. Compute visible sessions and apply grid layout ──
     const allIds = activeGroupSessions.map((s) => s.id);
     const visibleIds = splitMode
       ? allIds
@@ -266,6 +273,7 @@ export function TerminalPanel() {
       if (sid === selectedSessionId) continue;
       inst.container.style.display = "none";
       inst.container.classList.remove("active");
+      inst.container.style.outline = "";
       inst.container.style.gridRow = "";
       inst.container.style.gridColumn = "";
     }
@@ -286,6 +294,7 @@ export function TerminalPanel() {
         inst.container.style.gridColumn = pos?.gridColumn ?? "";
         const isActive = sid === selectedSessionId;
         inst.container.classList.toggle("active", isActive);
+        inst.container.style.outline = isActive ? "1px solid #60cdff" : "";
 
         let overlay = inst.container.querySelector(".term-ime-guard") as HTMLDivElement | null;
         if (isActive) {
@@ -316,6 +325,7 @@ export function TerminalPanel() {
       for (const [, inst] of instances) {
         inst.container.style.display = "none";
         inst.container.classList.remove("active");
+        inst.container.style.outline = "";
       }
       root.className = "terminal-container";
       root.style.display = "";
@@ -323,14 +333,11 @@ export function TerminalPanel() {
       root.style.gridTemplateRows = "";
     }
 
+    // ── 3. Refit after browser paint ──
     setTimeout(() => {
       refitVisible(visibleIds, termInstancesRef.current);
     }, 0);
-  }, [activeGroupSessions, selectedSessionId, splitMode]);
-
-  useLayoutEffect(() => {
-    applyLayout();
-  }, [applyLayout]);
+  }, [sessions, activeGroupSessions, selectedSessionId, splitMode]);
 
   // ── Refit on container resize ──
   useEffect(() => {
@@ -398,7 +405,7 @@ export function TerminalPanel() {
             activeGroupId={activeGroupId}
             onSwitchGroup={switchGroup}
             onRenameGroup={renameGroup}
-            onDeleteGroup={deleteGroup}
+            onDeleteGroup={setConfirmDeleteGroupId}
             onAddGroup={addGroup}
             onMoveSessionToGroup={moveSessionToGroup}
           />
@@ -440,6 +447,16 @@ export function TerminalPanel() {
           <span className={styles.terminalPlaceholderHint}>Ctrl+Shift+P to open command palette</span>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDeleteGroupId}
+        title="删除分组"
+        confirmLabel="删除"
+        confirmClass="btn-danger"
+        message="确定要删除此分组？所有会话将被终止。"
+        onConfirm={handleConfirmDeleteGroup}
+        onCancel={() => setConfirmDeleteGroupId(null)}
+      />
     </div>
   );
 }
