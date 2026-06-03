@@ -42,23 +42,23 @@
   top: 50%;
   transform: translateY(-50%) translateX(0);
   z-index: 50;
-  width: 20px;
-  height: 40px;
-  border: 1px solid var(--border);
-  border-left: none;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: var(--bg-surface);
-  color: var(--text-muted);
+  width: 14px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.25s var(--ease-out-expo);
+  opacity: 0.25;
+  transition: transform 0.25s var(--ease-out-expo), opacity 0.15s var(--ease-smooth), background 0.15s var(--ease-smooth), color 0.15s var(--ease-smooth);
 }
 
 .sidebarToggle:hover {
+  opacity: 1;
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--text-muted);
 }
 
 .sidebarToggle.collapsed {
