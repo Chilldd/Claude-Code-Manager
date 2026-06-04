@@ -163,8 +163,8 @@ export function useSessionManager(): SessionManager {
         }
         seenInAgent.add(session.id);
 
-        // Mark activity when agent is busy or waiting
-        if (info.status === "busy" || info.status === "waiting") {
+        // Mark activity when agent is busy (actually working, not just waiting for input)
+        if (info.status === "busy") {
           hadActivity.set(session.id, true);
         }
 
