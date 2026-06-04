@@ -44,7 +44,7 @@ export interface SessionManager {
   activeGroupSessionIds: string[];
   activeGroupSessions: SessionInfo[];
 
-  launchSession: (ws: Workspace, worktreeName?: string) => Promise<void>;
+  launchSession: (ws: Workspace, worktreeName?: string, resumeSessionId?: string) => Promise<void>;
   stopSession: (sessionId: string) => Promise<void>;
   selectSession: (sessionId: string) => void;
   toggleExpand: (workspaceId: string) => void;
@@ -330,10 +330,10 @@ export function useSessionManager(): SessionManager {
   }, []);
 
   const launchSession = useCallback(
-    async (ws: Workspace, worktreeName?: string) => {
+    async (ws: Workspace, worktreeName?: string, resumeSessionId?: string) => {
       const sessionIndex = nextSessionIndex();
       const sessionName = `[${sessionIndex}] ${ws.name}`;
-      const sessionId = crypto.randomUUID();
+      const sessionId = resumeSessionId ?? crypto.randomUUID();
       api.debugLog(`launchSession: calling createPty sid=${sessionId} cmd=${ws.command} args=${ws.args}`);
       try {
         await api.createPty(

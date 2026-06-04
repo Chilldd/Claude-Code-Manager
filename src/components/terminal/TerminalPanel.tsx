@@ -176,7 +176,7 @@ export function TerminalPanel() {
         cursorBlink: true, cursorStyle: "block", cursorInactiveStyle: "none", cursorWidth: 2,
         fontSize: 15, lineHeight: 1.2,
         fontFamily: "'Cascadia Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
-        fontWeight: "350", fontWeightBold: "600",
+        fontWeight: "400", fontWeightBold: "600",
         theme: TERM_THEME, allowTransparency: false, drawBoldTextInBrightColors: true,
         letterSpacing: 0,
       });

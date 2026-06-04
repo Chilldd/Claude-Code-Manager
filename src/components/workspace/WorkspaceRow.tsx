@@ -15,6 +15,7 @@ interface Props {
   onToggleExpand: () => void;
   onLaunchSession: () => void;
   onLaunchWorktree: () => void;
+  onResumeSession: (sessionId: string) => void;
   onStopSession: (sessionId: string) => void;
   onSelectSession: (sessionId: string) => void;
   onEdit: () => void;
@@ -33,6 +34,7 @@ export function WorkspaceRow({
   onToggleExpand,
   onLaunchSession,
   onLaunchWorktree,
+  onResumeSession,
   onStopSession,
   onSelectSession,
   onEdit,
@@ -193,8 +195,8 @@ export function WorkspaceRow({
                 <div
                   key={h.session_id}
                   className={styles.historyItem}
-                  onClick={onLaunchSession}
-                  title="点击启动新会话"
+                  onClick={() => onResumeSession(h.session_id)}
+                  title="恢复此会话"
                 >
                   <span className={styles.historyIcon}>↻</span>
                   <span className={styles.historyName}>{workspace.name}</span>

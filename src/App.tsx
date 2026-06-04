@@ -89,6 +89,22 @@ function App() {
     [launchSession]
   );
 
+  const handleResumeSession = useCallback(
+    async (ws: Workspace, sessionId: string) => {
+      setPtyError(null);
+      try {
+        await launchSession(ws, undefined, sessionId);
+      } catch (e) {
+        setPtyError(String(e));
+      }
+    },
+    [launchSession]
+  );
+      }
+    },
+    [launchSession]
+  );
+
   const handleOpenInExplorer = useCallback(
     async (ws: Workspace) => {
       try {
@@ -179,6 +195,7 @@ function App() {
               workspaces={workspaces}
               onLaunchSession={handleLaunchSession}
               onLaunchWorktree={setWorktreeDialogWs}
+              onResumeSession={handleResumeSession}
               onEdit={setEditingWorkspace}
               onDelete={setConfirmDeleteId}
               onOpenInExplorer={handleOpenInExplorer}

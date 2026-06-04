@@ -9,6 +9,7 @@ interface Props {
   workspaces: Workspace[];
   onLaunchSession: (ws: Workspace) => void;
   onLaunchWorktree: (ws: Workspace) => void;
+  onResumeSession: (ws: Workspace, sessionId: string) => void;
   onEdit: (ws: Workspace) => void;
   onDelete: (workspaceId: string) => void;
   onOpenInExplorer: (ws: Workspace) => void;
@@ -22,6 +23,7 @@ export function WorkspacePanel({
   workspaces,
   onLaunchSession,
   onLaunchWorktree,
+  onResumeSession,
   onEdit,
   onDelete,
   onOpenInExplorer,
@@ -81,6 +83,7 @@ export function WorkspacePanel({
               onToggleExpand={() => toggleExpand(ws.id)}
               onLaunchSession={() => onLaunchSession(ws)}
               onLaunchWorktree={() => onLaunchWorktree(ws)}
+              onResumeSession={(sid) => onResumeSession(ws, sid)}
               onStopSession={stopSession}
               onSelectSession={selectSession}
               onEdit={() => onEdit(ws)}
