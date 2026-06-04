@@ -174,9 +174,9 @@ export function TerminalPanel() {
 
       const term = new Terminal({
         cursorBlink: true, cursorStyle: "block", cursorInactiveStyle: "none", cursorWidth: 2,
-        fontSize: 15, lineHeight: 1.25,
-        fontFamily: "'Cascadia Code', 'Cascadia Mono', 'Consolas', 'Courier New', monospace",
-        fontWeight: "400", fontWeightBold: "700",
+        fontSize: 12, lineHeight: 1.2,
+        fontFamily: "'Cascadia Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+        fontWeight: "normal", fontWeightBold: "700",
         theme: TERM_THEME, allowTransparency: false, drawBoldTextInBrightColors: true,
         letterSpacing: 0,
       });
