@@ -11,11 +11,13 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@tauri-apps/plugin-notification": "^2.0.0",
+    "@xterm/addon-webgl": "^0.19.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "xterm": "^5.3.0",
     "xterm-addon-fit": "^0.8.0",
-    "@tauri-apps/plugin-notification": "^2.0.0"
+    "xterm-addon-webgl": "^0.16.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

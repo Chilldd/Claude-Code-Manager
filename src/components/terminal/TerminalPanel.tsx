@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { api, onPtyOutput, onPtyExit } from "../../api";
 import type { PtyOutputEvent, PtyExitEvent } from "../../api";
 import { useSession } from "../../contexts/SessionContext";
@@ -197,6 +198,13 @@ export function TerminalPanel() {
       const fitAddon = new FitAddon();
       term.loadAddon(fitAddon);
       term.open(container);
+
+      // WebGL renderer — better text quality on Windows; falls back to canvas on failure
+      try {
+        term.loadAddon(new WebglAddon());
+      } catch (e) {
+        api.debugLog(`[TerminalPanel] WebGL addon failed for sid=${session.id}, using canvas: ${e}`);
+      }
 
       container.addEventListener("click", () => onSelectRef.current(session.id));
       term.onData((data) => {
