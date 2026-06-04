@@ -93,7 +93,8 @@ function App() {
     async (ws: Workspace, sessionId: string) => {
       setPtyError(null);
       try {
-        await launchSession(ws, undefined, sessionId);
+        const modifiedWs = { ...ws, args: `--resume ${sessionId}`, auto_prompt: "" };
+        await launchSession(modifiedWs, undefined, sessionId);
       } catch (e) {
         setPtyError(String(e));
       }
