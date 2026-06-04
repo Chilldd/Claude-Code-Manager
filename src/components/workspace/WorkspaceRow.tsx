@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { api } from "../../api";
 import type { Workspace } from "../../api";
 import type { SessionInfo } from "../../types";
 import { cn } from "../../utils/cn";
@@ -55,6 +56,33 @@ export function WorkspaceRow({
   }, [menuOpen, closeMenu]);
 
   const wsSessions = sessions.filter((s) => s.workspaceId === workspace.id);
+
+  // ── Recent session history from Claude Code project files ──
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [recentSessions, setRecentSessions] = useState<{ session_id: string; last_modified: number }[] | null>(null);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    let cancelled = false;
+    api.getRecentSessions(workspace.path).then((data) => {
+      if (!cancelled) setRecentSessions(data);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [isExpanded, workspace.path]);
+
+  const historySessions = (recentSessions ?? []).filter(
+    (h) => !sessions.some((s) => s.workspaceId === workspace.id && s.name.includes(h.session_id))
+  );
+
+  function formatRelativeTime(ts: number): string {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "刚刚";
+    if (mins < 60) return `${mins} 分钟前`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    return `${Math.floor(hours / 24)} 天前`;
+  }
 
   return (
     <div className={styles.workspaceGroup}>
@@ -179,6 +207,32 @@ export function WorkspaceRow({
               </button>
             </div>
           ))}
+
+          {/* ── History sessions ── */}
+          {historySessions.length > 0 && (
+            <>
+              <div
+                className={styles.historyHeader}
+                onClick={() => setHistoryOpen(!historyOpen)}
+              >
+                <span className={styles.historyArrow}>{historyOpen ? "▼" : "▶"}</span>
+                历史会话
+                <span className={styles.historyCount}>{historySessions.length}</span>
+              </div>
+              {historyOpen && historySessions.map((h) => (
+                <div
+                  key={h.session_id}
+                  className={styles.historyItem}
+                  onClick={onLaunchSession}
+                  title="点击启动新会话"
+                >
+                  <span className={styles.historyIcon}>↻</span>
+                  <span className={styles.historyName}>{workspace.name}</span>
+                  <span className={styles.historyTime}>{formatRelativeTime(h.last_modified)}</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

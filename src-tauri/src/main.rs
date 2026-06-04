@@ -65,6 +65,11 @@ fn import_from_claude_code() -> Vec<workspace::Workspace> {
     import::import_from_claude_code()
 }
 
+#[tauri::command]
+fn get_recent_sessions(workspace_path: String) -> Vec<import::SessionSummary> {
+    import::recent_sessions(&workspace_path, 3)
+}
+
 // PTY session management
 
 #[tauri::command]
@@ -352,6 +357,7 @@ fn main() {
             delete_workspace,
             reorder_workspaces,
             import_from_claude_code,
+            get_recent_sessions,
             create_pty,
             write_pty,
             resize_pty,

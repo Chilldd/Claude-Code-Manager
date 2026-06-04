@@ -156,6 +156,10 @@ export const api = {
   /** Scan git worktrees in a directory */
   scanWorktrees: (path: string) =>
     invoke<{ name: string; path: string; active: boolean }[]>("scan_worktrees", { path }),
+
+  /** Get recent Claude Code sessions for a workspace path */
+  getRecentSessions: (workspacePath: string) =>
+    invoke<{ session_id: string; last_modified: number }[]>("get_recent_sessions", { workspacePath }),
 };
 
 // ── Event listeners (event-driven, replaces polling) ──

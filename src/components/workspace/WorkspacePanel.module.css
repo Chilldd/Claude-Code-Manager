@@ -391,6 +391,74 @@
   opacity: 1 !important;
 }
 
+/* ── History sessions ── */
+.historyHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  margin-top: 4px;
+}
+
+.historyHeader:hover {
+  color: var(--text-secondary);
+}
+
+.historyArrow {
+  font-size: 8px;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.historyCount {
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  line-height: 16px;
+  margin-left: auto;
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: background 0.12s var(--ease-smooth);
+}
+
+.historyItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.historyIcon {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.historyName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyTime {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
 /* ── Active indicator dot on workspace name ── */
 .indicator {
   width: 6px;

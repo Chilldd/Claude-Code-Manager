@@ -1,8 +1,10 @@
 use crate::{log::debug_log, workspace};
+use serde::Serialize;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 // ── Discovery ──
 
@@ -216,6 +218,59 @@ fn extract_cwd_from_raw(content: &str, marker: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Encode a filesystem path to a Claude Code project folder name.
+/// `D:\WorkSpace\YuG\agent\yug-cc-manager` → `D--WorkSpace-YuG-agent-yug-cc-manager`
+pub fn encode_folder_name(path: &str) -> String {
+    path.replace(':', "-").replace('\\', "-")
+}
+
+/// Summary of a recent session file
+#[derive(Debug, Clone, Serialize)]
+pub struct SessionSummary {
+    pub session_id: String,
+    /// Unix timestamp (milliseconds) of last modification
+    pub last_modified: u64,
+}
+
+/// Return the most recent session `.jsonl` files for a workspace directory.
+pub fn recent_sessions(workspace_dir: &str, max: usize) -> Vec<SessionSummary> {
+    let mut dir = claude_projects_dir();
+    dir.push(encode_folder_name(workspace_dir));
+
+    if !dir.is_dir() {
+        return vec![];
+    }
+
+    let mut sessions: Vec<SessionSummary> = fs::read_dir(&dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl"))
+                .filter_map(|e| {
+                    let session_id = e.path().file_stem()?.to_string_lossy().to_string();
+                    let last_modified = e
+                        .metadata()
+                        .ok()?
+                        .modified()
+                        .ok()?
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .ok()?
+                        .as_millis() as u64;
+                    Some(SessionSummary {
+                        session_id,
+                        last_modified,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Sort newest first, keep only the most recent `max`
+    sessions.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+    sessions.truncate(max);
+    sessions
 }
 
 #[cfg(test)]
