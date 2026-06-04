@@ -109,17 +109,22 @@ export interface NotifySessionOptions {
 export async function notifySession(opts: NotifySessionOptions): Promise<void> {
   const { title, sessionName, detail, sessionId } = opts;
 
-  // 通知体格式: "[my-project] [3] Claude Code" 或 "[my-project] [3] Claude Code exited with code 1"
-  const tag = opts.workspaceName ? `[${opts.workspaceName}]` : "";
-  const parts = [tag, sessionName, detail].filter(Boolean);
-  const body = parts.join(" ");
+  // 通知格式：
+  //   【工作区】【下标】
+  //   标题
+  //   内容
+  const tag = opts.workspaceName ? `【${opts.workspaceName}】` : "";
+  const line1 = [tag, sessionName].filter(Boolean).join("");
+  const line2 = title;
+  const line3 = detail ?? "";
+  const body = [line1, line2, line3].filter(Boolean).join("\n");
 
   // 优先使用 Rust 原生通知（支持点击跳转），回退到 JS API
   if (sessionId) {
     try {
       await invoke("send_session_notification", {
         sessionId,
-        title,
+        title: "",
         body,
       });
       return;
@@ -128,5 +133,5 @@ export async function notifySession(opts: NotifySessionOptions): Promise<void> {
     }
   }
 
-  return notify({ title, body });
+  return notify({ title: "", body });
 }

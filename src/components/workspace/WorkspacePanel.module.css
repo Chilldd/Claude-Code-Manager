@@ -329,8 +329,7 @@
 }
 
 .sessionIndicator.running {
-  background: var(--accent);
-  box-shadow: 0 0 4px var(--accent-glow);
+  background: var(--success);
 }
 
 .sessionIndicator.thinking {
@@ -340,6 +339,10 @@
 
 .sessionIndicator.idle {
   background: var(--success);
+}
+
+.sessionIndicator.waiting {
+  background: var(--danger);
 }
 
 .sessionIndicator.attention {

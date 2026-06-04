@@ -289,6 +289,7 @@ export function TerminalPanel() {
     }
   }, [sessions, activeGroupSessions, selectedSessionId, splitMode]);
 
+
   // ── Refit on container resize ──
   useEffect(() => {
     const root = containerRootRef.current;

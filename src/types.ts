@@ -2,7 +2,7 @@
 
 import type { SessionBackendState } from "./api";
 
-export type SessionStatus = "running" | "thinking" | "idle" | "attention" | "exited";
+export type SessionStatus = "running" | "thinking" | "idle" | "attention" | "exited" | "waiting";
 
 export interface SessionInfo {
   id: string;
@@ -28,24 +28,6 @@ export function nextGroupInfo(groups: SessionGroup[]): { id: string; name: strin
   const maxNum = groups.reduce((max, g) => Math.max(max, parseInt(g.id.replace('g', '')) || 0), 1);
   const n = maxNum + 1;
   return { id: `g${n}`, name: `Group ${n}` };
-}
-
-/** Detect if a character is a Braille-pattern spinner (U+2800-U+28FF range) */
-export function isSpinnerChar(ch: string): boolean {
-  const code = ch.codePointAt(0);
-  return code !== undefined && code >= 0x2800 && code <= 0x28FF;
-}
-
-/** Infer claude status from terminal title */
-export function inferStatus(title: string): SessionStatus {
-  const trimmed = title.trim();
-  const claudeIdx = trimmed.indexOf("Claude Code");
-  if (claudeIdx >= 0) {
-    const prefix = trimmed[claudeIdx - 2] ?? "";
-    if (isSpinnerChar(prefix)) return "thinking";
-    return "idle";
-  }
-  return "running";
 }
 
 /** Detect Claude Code permission prompt from PTY output text */

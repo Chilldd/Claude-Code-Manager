@@ -3,6 +3,27 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::thread;
+
+/// On Windows, npm-installed tools like `claude` are `.cmd` shims that
+/// `CreateProcessW` cannot execute directly.  If the command has no
+/// executable extension, run it via `cmd /c`.
+fn resolve_command(cmd: &str, args: &[String]) -> (String, Vec<String>) {
+    #[cfg(windows)]
+    {
+        let lower = cmd.to_lowercase();
+        let has_ext = lower.ends_with(".exe")
+            || lower.ends_with(".cmd")
+            || lower.ends_with(".bat")
+            || lower.ends_with(".com");
+        if !has_ext {
+            let mut cmd_args = vec!["/c".to_string(), cmd.to_string()];
+            cmd_args.extend_from_slice(args);
+            return ("cmd.exe".to_string(), cmd_args);
+        }
+    }
+    // Non-Windows or already an executable — use as-is
+    (cmd.to_string(), args.to_vec())
+}
 use sysinfo::ProcessesToUpdate;
 use tauri::{Emitter, WebviewWindow};
 
@@ -131,6 +152,7 @@ impl PtyManager {
     pub fn create(
         &mut self,
         window: &WebviewWindow,
+        session_id: &str,
         workspace_id: &str,
         session_name: &str,
         command: &str,
@@ -138,8 +160,11 @@ impl PtyManager {
         cwd: &str,
         env: HashMap<String, String>,
     ) -> Result<(String, Vec<u32>), String> {
-        let session_id = uuid::Uuid::new_v4().to_string();
-        let args = parse_args(args);
+        let mut args = parse_args(args);
+
+        // Inject --session-id so the spawned process can identify itself
+        args.push("--session-id".to_string());
+        args.push(session_id.to_string());
 
         let pty_system = NativePtySystem::default();
         let pair = pty_system
@@ -161,13 +186,14 @@ impl PtyManager {
             .try_clone_writer()
             .map_err(|e| format!("PTY writer: {}", e))?;
 
-        let mut cmd_builder = CommandBuilder::new(command);
-        for a in &args {
+        let (resolved_cmd, resolved_args) = resolve_command(command, &args);
+        let mut cmd_builder = CommandBuilder::new(&resolved_cmd);
+        for a in &resolved_args {
             cmd_builder.arg(a);
         }
         cmd_builder.cwd(cwd);
 
-        eprintln!("[pty] create: cmd={}, args={:?}, cwd={}", command, args, cwd);
+        eprintln!("[pty] create: cmd={}, resolved_cmd={}, args={:?}, cwd={}", command, resolved_cmd, resolved_args, cwd);
 
         for (key, value) in &env {
             cmd_builder.env(key, value);
@@ -177,7 +203,7 @@ impl PtyManager {
         let _ = window.emit(
             "pty-output",
             PtyOutputPayload {
-                session_id: session_id.clone(),
+                session_id: session_id.to_string(),
                 data: format!(
                     "\r\n[Starting: {} {} in {}]\r\n\r\n",
                     command,
@@ -194,7 +220,7 @@ impl PtyManager {
             let _ = window.emit(
                 "pty-output",
                 PtyOutputPayload {
-                    session_id: session_id.clone(),
+                    session_id: session_id.to_string(),
                     data: format!("\r\n[{}]\r\n", msg),
                 },
             );
@@ -205,18 +231,18 @@ impl PtyManager {
         let root_pids = detect_our_child_pids();
 
         let session = PtySession {
-            id: session_id.clone(),
+            id: session_id.to_string(),
             workspace_id: workspace_id.to_string(),
             name: session_name.to_string(),
             child: Some(child),
             writer: Some(writer),
             master: Some(pair.master),
         };
-        self.sessions.insert(session_id.clone(), session);
+        self.sessions.insert(session_id.to_string(), session);
 
         // Reader thread — emits PTY events scoped by session_id
         let win = window.clone();
-        let sid = session_id.clone();
+        let sid = session_id.to_string();
         eprintln!("[pty] reader thread spawning for {}", sid);
         thread::spawn(move || {
             eprintln!("[pty] reader thread STARTED for {}", sid);
@@ -291,7 +317,7 @@ impl PtyManager {
             }
         });
 
-        Ok((session_id, root_pids))
+        Ok((session_id.to_string(), root_pids))
     }
 
     pub fn write(&mut self, session_id: &str, data: &str) -> Result<(), String> {

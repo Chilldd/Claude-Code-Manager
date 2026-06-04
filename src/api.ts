@@ -36,6 +36,29 @@ export interface BackendSessionInfo {
 
 export type SessionBackendState = "created" | "running" | "busy" | "idle" | "zombie" | "exited";
 
+/** Notification preferences (from ccmanager.json) */
+export interface NotificationConfig {
+  task_complete: boolean;
+  permission_prompt: boolean;
+}
+
+export interface Ccconfig {
+  notification: NotificationConfig;
+}
+
+export type AgentStatus = "idle" | "busy" | "waiting" | "running";
+
+/** One entry from `claude agents --json` */
+export interface ClaudeAgentInfo {
+  pid: number;
+  cwd: string;
+  kind: string;
+  started_at: number;
+  session_id: string;
+  status: AgentStatus;
+  waiting_for?: string;
+}
+
 // ── Metrics event types (event-driven, no polling) ──
 
 export interface SystemMetrics {
@@ -94,8 +117,8 @@ export const api = {
   reorderWorkspaces: (ids: string[]) =>
     invoke<Workspace[]>("reorder_workspaces", { ids }),
 
-  createPty: (workspaceId: string, sessionName: string, command: string, args: string, cwd: string, env: Record<string, string>) =>
-    invoke<string>("create_pty", { workspaceId, sessionName, command, args, cwd, env }),
+  createPty: (sessionId: string, workspaceId: string, sessionName: string, command: string, args: string, cwd: string, env: Record<string, string>) =>
+    invoke<string>("create_pty", { sessionId, workspaceId, sessionName, command, args, cwd, env }),
   writePty: (sessionId: string, data: string) =>
     invoke<void>("write_pty", { sessionId, data }),
   resizePty: (sessionId: string, cols: number, rows: number) =>
@@ -114,6 +137,13 @@ export const api = {
   /** Import workspaces from Claude Code's project directory (~/.claude/projects/) */
   importFromClaudeCode: () =>
     invoke<Workspace[]>("import_from_claude_code"),
+
+  /** Load notification preferences from ccmanager.json */
+  getConfig: () => invoke<Ccconfig>("get_config"),
+
+  /** Get Claude agent info by session_id */
+  getAgentInfo: (sessionId: string) =>
+    invoke<ClaudeAgentInfo | null>("get_agent_info", { sessionId }),
 
   /** Open a directory in the system file explorer */
   openInExplorer: (path: string) =>
@@ -176,7 +206,17 @@ export function onSessionCreated(
 export function onSessionKilled(
   cb: (payload: { session_id: string }) => void,
 ): Promise<() => void> {
+
   return listen<{ session_id: string }>("session-killed", (e) =>
+    cb(e.payload),
+  );
+}
+
+/** Claude agent snapshot pushed from backend every 1s */
+export function onClaudeAgentsUpdated(
+  cb: (agents: Record<string, ClaudeAgentInfo>) => void,
+): Promise<() => void> {
+  return listen<Record<string, ClaudeAgentInfo>>("claude-agents-updated", (e) =>
     cb(e.payload),
   );
 }

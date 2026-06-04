@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { api, onPtyTitle, onPtyExit, onPtyOutput } from "../api";
-import type { Workspace } from "../api";
+import { api, onPtyTitle, onPtyExit, onPtyOutput, onClaudeAgentsUpdated } from "../api";
+import type { Workspace, ClaudeAgentInfo, Ccconfig } from "../api";
+import { notifySession } from "../notification";
 import type {
   SessionInfo,
   SessionGroup,
@@ -9,11 +10,24 @@ import type {
 import {
   MAX_GROUP_SIZE,
   nextGroupInfo,
-  inferStatus,
   isPermissionPrompt,
 } from "../types";
-import { notifySession } from "../notification";
 import { listen } from "@tauri-apps/api/event";
+
+/** Map `claude agents --json` status to frontend SessionStatus */
+function mapAgentStatus(info: ClaudeAgentInfo): SessionStatus | undefined {
+  switch (info.status) {
+    case "busy":
+      return "thinking";
+    case "idle":
+      return "idle";
+    case "waiting":
+      return "waiting";
+    // "running" or unknown — leave existing status unchanged
+    default:
+      return undefined;
+  }
+}
 
 export interface SessionManager {
   sessions: SessionInfo[];
@@ -48,6 +62,9 @@ export function useSessionManager(): SessionManager {
   const activeGroupIdRef = useRef(activeGroupId);
   activeGroupIdRef.current = activeGroupId;
 
+  // Notification config — default values applied immediately, async loaded from backend
+  const configRef = useRef<Ccconfig>({ notification: { task_complete: false, permission_prompt: true } });
+
   // Module-level mutable counter becomes a ref
   const sessionCounterRef = useRef(0);
   const nextSessionIndex = useCallback(() => {
@@ -74,41 +91,16 @@ export function useSessionManager(): SessionManager {
     }
   }, []);
 
-  // Listen for PTY title changes — infer status, detect task completion
+  // Listen for PTY title changes — only updates session name, status comes from agent polling
   useEffect(() => {
-    let prevStatusMap = new Map<string, SessionStatus>();
-
     const unlisten = onPtyTitle((payload) => {
-      // Read session from ref (latest committed state) to determine transition
       const session = sessionsRef.current.find((s) => s.id === payload.session_id);
       if (!session) return;
-
-      const newStatus = inferStatus(payload.title);
-      const oldStatus = prevStatusMap.get(payload.session_id);
-      prevStatusMap.set(payload.session_id, newStatus); // <-- side effect, ok outside updater
-
-      // Task complete: thinking → idle → fire system notification
-      if (oldStatus === "thinking" && newStatus === "idle") {
-        notifySession({                                // <-- side effect, ok outside updater
-          title: "✅ Task Complete",
-          sessionName: session.name,
-          workspaceName: session.workspaceName,
-          sessionId: session.id,
-        });
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === payload.session_id
-              ? { ...s, name: `[${s.sessionIndex}] ${payload.title}`, status: "attention" as const }
-              : s
-          )
-        );
-        return;
-      }
 
       setSessions((prev) =>
         prev.map((s) =>
           s.id === payload.session_id
-            ? { ...s, name: `[${s.sessionIndex}] ${payload.title}`, status: newStatus }
+            ? { ...s, name: `[${s.sessionIndex}] ${payload.title}` }
             : s
         )
       );
@@ -125,14 +117,86 @@ export function useSessionManager(): SessionManager {
       if (!session) return;
       if (payload.code === 0) return;
 
-      notifySession({
-        title: "⚠️ Session Exited",
-        sessionName: session.name,
-        workspaceName: session.workspaceName,
-        sessionId: session.id,
-        detail: `exited with code ${payload.code}`,
-      });
+      // notifySession hook placeholder — add back when needed
     });
+    return () => {
+      unlisten.then((fn) => fn()).catch(() => {});
+    };
+  }, []);
+
+  // Listen for real-time agent updates pushed from backend every 500ms
+  useEffect(() => {
+    const seenInAgent = new Set<string>();
+    /// Track whether a session has ever been "busy" or "waiting" since last idle.
+    const hadActivity = new Map<string, boolean>();
+
+    const unlisten = onClaudeAgentsUpdated((agents) => {
+      const cfg = configRef.current;
+      const current = sessionsRef.current;
+
+      for (const session of current) {
+        if (session.status === "exited") continue;
+
+        const info = agents[session.id];
+        if (!info) {
+          // Not found — might have exited (e.g. /exit)
+          if (seenInAgent.has(session.id)) {
+            seenInAgent.delete(session.id);
+            hadActivity.delete(session.id);
+            setSessions((prev) =>
+              prev.map((s) =>
+                s.id === session.id
+                  ? { ...s, status: "exited" as const, name: `[${s.sessionIndex}] 已退出` }
+                  : s
+              )
+            );
+          }
+          continue;
+        }
+        seenInAgent.add(session.id);
+
+        // Mark activity when agent is busy or waiting
+        if (info.status === "busy" || info.status === "waiting") {
+          hadActivity.set(session.id, true);
+        }
+
+        // Update display status
+        const newStatus = mapAgentStatus(info);
+        if (newStatus && newStatus !== session.status) {
+          const next = newStatus;
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === session.id ? { ...s, status: next } : s
+            )
+          );
+
+          // Permission-prompt notification (display just became "waiting")
+          if (next === "waiting" && cfg.notification.permission_prompt) {
+            notifySession({
+              title: "⚡ 需要授权",
+              sessionName: session.name,
+              workspaceName: session.workspaceName,
+              sessionId: session.id,
+              detail: "Claude Code 需要你的授权才能继续执行",
+            });
+          }
+        }
+
+        // Task-complete notification (was active, now idle)
+        if (info.status === "idle" && hadActivity.get(session.id)) {
+          hadActivity.delete(session.id);
+          if (cfg.notification.task_complete) {
+            notifySession({
+              title: "✅ 任务完成",
+              sessionName: session.name,
+              workspaceName: session.workspaceName,
+              sessionId: session.id,
+            });
+          }
+        }
+      }
+    });
+
     return () => {
       unlisten.then((fn) => fn()).catch(() => {});
     };
@@ -154,13 +218,15 @@ export function useSessionManager(): SessionManager {
       const session = sessionsRef.current.find((s) => s.id === sid);
       if (!session) return;
 
-      notifySession({
-        title: "⚡ Permission Required",
-        sessionName: session.name,
-        workspaceName: session.workspaceName,
-        sessionId: session.id,
-        detail: "Claude Code needs your permission to continue",
-      });
+      if (configRef.current.notification.permission_prompt) {
+        notifySession({
+          title: "⚡ 需要授权",
+          sessionName: session.name,
+          workspaceName: session.workspaceName,
+          sessionId: session.id,
+          detail: "Claude Code 需要你的授权才能继续执行",
+        });
+      }
 
       setSessions((prev) =>
         prev.map((s) =>
@@ -180,6 +246,7 @@ export function useSessionManager(): SessionManager {
     const unlisten = listen<{ session_id: string }>("session-deeplink", (event) => {
       const sid = event.payload.session_id;
       if (!sid) return;
+
       setSelectedSessionId(sid);
       setSessions((prev) =>
         prev.map((s) =>
@@ -213,6 +280,11 @@ export function useSessionManager(): SessionManager {
       return changed ? next : prev;
     });
   }, [sessions]);
+
+  // Load notification config once on mount
+  useEffect(() => {
+    api.getConfig().then((cfg) => { configRef.current = cfg; }).catch(() => {});
+  }, []);
 
   // ── Callbacks ──
 
@@ -248,9 +320,11 @@ export function useSessionManager(): SessionManager {
     async (ws: Workspace, worktreeName?: string) => {
       const sessionIndex = nextSessionIndex();
       const sessionName = `[${sessionIndex}] ${ws.name}`;
-      api.debugLog(`launchSession: calling createPty cmd=${ws.command} args=${ws.args}`);
+      const sessionId = crypto.randomUUID();
+      api.debugLog(`launchSession: calling createPty sid=${sessionId} cmd=${ws.command} args=${ws.args}`);
       try {
-        const sessionId = await api.createPty(
+        await api.createPty(
+          sessionId,
           ws.id,
           sessionName,
           ws.command,
@@ -307,12 +381,7 @@ export function useSessionManager(): SessionManager {
         api.debugLog("launchSession: ALL STEPS COMPLETE");
       } catch (e) {
         api.debugLog(`launchSession CAUGHT: ${e}`);
-        notifySession({
-          title: "❌ Launch Error",
-          sessionName: sessionName,
-          workspaceName: ws.name,
-          detail: String(e),
-        });
+        // notifySession hook placeholder
       }
     },
     [activeGroupId, nextSessionIndex]

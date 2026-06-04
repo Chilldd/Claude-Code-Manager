@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![windows_subsystem = "windows"]
 
+mod claude_agents;
+mod config;
 mod errors;
 mod import;
 pub mod log;
@@ -26,6 +28,7 @@ fn frontend_log(msg: String) {
 struct AppState {
     pty: Mutex<pty::PtyManager>,
     metrics: Mutex<metrics::MetricsEngine>,
+    agents: claude_agents::ClaudeAgentMonitor,
 }
 
 // ── Tauri commands ──
@@ -68,6 +71,7 @@ fn import_from_claude_code() -> Vec<workspace::Workspace> {
 fn create_pty(
     window: WebviewWindow,
     state: tauri::State<'_, AppState>,
+    session_id: String,
     workspace_id: String,
     session_name: String,
     command: String,
@@ -75,7 +79,7 @@ fn create_pty(
     cwd: String,
     env: std::collections::HashMap<String, String>,
 ) -> Result<String, AppError> {
-    debug_log(format!("create_pty: cmd={}, args={}, cwd={}", command, args, cwd));
+    debug_log(format!("create_pty: sid={}, cmd={}, args={}, cwd={}", &session_id, command, args, cwd));
 
     let mut pty = state.pty.lock().map_err(|e| {
         let msg = format!("pty lock: {}", e);
@@ -83,8 +87,9 @@ fn create_pty(
         AppError::Internal(msg)
     })?;
 
-    let (session_id, root_pids) = pty.create(
+    let (_, root_pids) = pty.create(
         &window,
+        &session_id,
         &workspace_id,
         &session_name,
         &command,
@@ -205,6 +210,19 @@ fn list_active_sessions(
 }
 
 #[tauri::command]
+fn get_agent_info(
+    state: tauri::State<'_, AppState>,
+    session_id: String,
+) -> Option<claude_agents::ClaudeAgentInfo> {
+    state.agents.get(&session_id)
+}
+
+#[tauri::command]
+fn get_config() -> config::Ccconfig {
+    config::load()
+}
+
+#[tauri::command]
 fn open_in_explorer(path: String) -> Result<(), String> {
     debug_log(format!("[main] open_in_explorer path={}", path));
     let path = std::path::Path::new(&path);
@@ -284,6 +302,11 @@ fn send_session_notification(
 // ── Main ──
 
 fn main() {
+    // Load config early — logging and other subsystems depend on it
+    let cfg = config::load();
+    log::init(&cfg.log.level, &cfg.log.path);
+    debug_log("[main] config loaded, logging initialized");
+
     let incoming_deeplink = std::env::args()
         .find(|a| a.starts_with("yug-cc-manager://"))
         .and_then(|url| platform::deeplink::parse_session_id(&url));
@@ -307,10 +330,14 @@ fn main() {
             // Spawn the metrics engine (background sampling + event emitter)
             let metrics_engine = metrics::MetricsEngine::spawn(app.handle().clone());
 
+            // Spawn the Claude agents monitor (polls claude agents --json + emits events)
+            let agents_monitor = claude_agents::ClaudeAgentMonitor::spawn(app.handle().clone());
+
             // Store manager + metrics engine in app state
             app.manage(AppState {
                 pty: Mutex::new(pty::PtyManager::new()),
                 metrics: Mutex::new(metrics_engine),
+                agents: agents_monitor,
             });
 
             if let Some(sid) = incoming_deeplink {
@@ -331,6 +358,8 @@ fn main() {
             kill_pty,
             is_pty_active,
             list_active_sessions,
+            get_agent_info,
+            get_config,
             send_session_notification,
             open_in_explorer,
             scan_worktrees,

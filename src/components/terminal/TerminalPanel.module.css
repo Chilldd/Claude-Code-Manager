@@ -168,8 +168,7 @@
 }
 
 .tabIndicator.running {
-  background: var(--accent);
-  box-shadow: 0 0 4px var(--accent-glow);
+  background: var(--success);
 }
 
 .tabIndicator.thinking {
@@ -179,6 +178,10 @@
 
 .tabIndicator.idle {
   background: var(--success);
+}
+
+.tabIndicator.waiting {
+  background: var(--danger);
 }
 
 .tabIndicator.attention {
