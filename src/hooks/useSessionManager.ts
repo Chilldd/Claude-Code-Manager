@@ -315,16 +315,32 @@ export function useSessionManager(): SessionManager {
     try {
       await api.killPty(sessionId);
     } catch { /* ignore */ }
+
+    // Determine next selection before state updates
+    let nextSelectedId: string | null = null;
+    if (selectedSessionId === sessionId) {
+      const activeGroup = groups.find((g) => g.id === activeGroupId);
+      const remaining = activeGroup?.sessionIds.filter((id) => id !== sessionId) ?? [];
+      if (remaining.length > 0) {
+        nextSelectedId = remaining[0];
+      }
+    }
+
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    setSelectedSessionId((prev) => (prev === sessionId ? null : prev));
+    setSelectedSessionId((prev) => (prev === sessionId ? nextSelectedId : prev));
 
     setGroups((prev) => {
       let updated = prev
         .map((g) => ({ ...g, sessionIds: g.sessionIds.filter((id) => id !== sessionId) }))
         .filter((g) => g.sessionIds.length > 0);
       if (!updated.some((g) => g.id === activeGroupId)) {
+        // Active group is gone — switch to the first remaining group
         if (updated.length > 0) {
           setActiveGroupId(updated[0].id);
+          // If we didn't already pick a next session, select the first of the new group
+          if (nextSelectedId === null && updated[0].sessionIds.length > 0) {
+            setSelectedSessionId(updated[0].sessionIds[0]);
+          }
         } else {
           const fresh: SessionGroup = { id: 'g1', name: 'Group 1', sessionIds: [] };
           setActiveGroupId(fresh.id);
@@ -333,7 +349,7 @@ export function useSessionManager(): SessionManager {
       }
       return updated;
     });
-  }, [activeGroupId]);
+  }, [activeGroupId, groups, selectedSessionId]);
 
   const switchGroup = useCallback((groupId: string) => {
     setActiveGroupId(groupId);
@@ -393,6 +409,10 @@ export function useSessionManager(): SessionManager {
       }
       if (!updated.some((g) => g.id === activeGroupId)) {
         setActiveGroupId(updated[0].id);
+        // Select the first session of the new active group
+        if (updated[0].sessionIds.length > 0) {
+          setSelectedSessionId(updated[0].sessionIds[0]);
+        }
       }
       return updated;
     });
