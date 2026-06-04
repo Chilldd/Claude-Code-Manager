@@ -35,9 +35,9 @@
 
 .terminal-container.split-mode {
   display: grid;
-  gap: 2px;
-  background: var(--bg-surface);
-  padding: 2px;
+  gap: 4px;
+  background: var(--border);
+  padding: 4px;
 }
 
 /* xterm overrides */
