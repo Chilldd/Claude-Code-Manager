@@ -459,6 +459,13 @@
   flex-shrink: 0;
 }
 
+/* Separator between history and current sessions */
+.historySep {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 0;
+}
+
 /* ── Active indicator dot on workspace name ── */
 .indicator {
   width: 6px;

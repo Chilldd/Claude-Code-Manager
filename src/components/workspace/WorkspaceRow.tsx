@@ -175,9 +175,36 @@ export function WorkspaceRow({
         </div>
       </div>
 
-      {/* Session sub-list (expanded) */}
+      {/* Session sub-list (expanded) — history above current sessions */}
       {isExpanded && (
         <div className={styles.sessionList}>
+          {/* ── History sessions ── */}
+          {historySessions.length > 0 && (
+            <>
+              <div
+                className={styles.historyHeader}
+                onClick={() => setHistoryOpen(!historyOpen)}
+              >
+                <span className={styles.historyArrow}>{historyOpen ? "▼" : "▶"}</span>
+                历史会话
+                <span className={styles.historyCount}>{historySessions.length}</span>
+              </div>
+              {historyOpen && historySessions.map((h) => (
+                <div
+                  key={h.session_id}
+                  className={styles.historyItem}
+                  onClick={onLaunchSession}
+                  title="点击启动新会话"
+                >
+                  <span className={styles.historyIcon}>↻</span>
+                  <span className={styles.historyName}>{workspace.name}</span>
+                  <span className={styles.historyTime}>{formatRelativeTime(h.last_modified)}</span>
+                </div>
+              ))}
+              <div className={styles.historySep} />
+            </>
+          )}
+
           {wsSessions.length === 0 && (
             <div className={styles.sessionEmpty}>
               暂无会话。点击 <strong>+</strong> 启动
@@ -207,32 +234,6 @@ export function WorkspaceRow({
               </button>
             </div>
           ))}
-
-          {/* ── History sessions ── */}
-          {historySessions.length > 0 && (
-            <>
-              <div
-                className={styles.historyHeader}
-                onClick={() => setHistoryOpen(!historyOpen)}
-              >
-                <span className={styles.historyArrow}>{historyOpen ? "▼" : "▶"}</span>
-                历史会话
-                <span className={styles.historyCount}>{historySessions.length}</span>
-              </div>
-              {historyOpen && historySessions.map((h) => (
-                <div
-                  key={h.session_id}
-                  className={styles.historyItem}
-                  onClick={onLaunchSession}
-                  title="点击启动新会话"
-                >
-                  <span className={styles.historyIcon}>↻</span>
-                  <span className={styles.historyName}>{workspace.name}</span>
-                  <span className={styles.historyTime}>{formatRelativeTime(h.last_modified)}</span>
-                </div>
-              ))}
-            </>
-          )}
         </div>
       )}
     </div>
