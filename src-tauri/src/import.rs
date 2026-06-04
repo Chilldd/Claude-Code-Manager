@@ -222,51 +222,46 @@ fn extract_cwd_from_raw(content: &str, marker: &str) -> Option<String> {
 
 /// Try to extract a session title from a `.jsonl` conversation file.
 /// Claude Code stores the AI-generated title in a JSON line with
-/// `"type":"ai-title"` — scan the file (first 64 KB) for it.
+/// `"type":"ai-title"` and field `"aiTitle"`.  Read the file in 64 KB chunks
+/// (up to 2 chunks ~ 128 KB) to avoid loading large transcripts.
 fn extract_session_title(path: &Path) -> Option<String> {
     let file = fs::File::open(path).ok()?;
     let mut reader = BufReader::with_capacity(65_536, file);
     let mut buf = String::new();
-    reader.read_to_string(&mut buf).ok()?;
-
+    let mut total_read = 0usize;
     let marker = r#""type":"ai-title""#;
-    let pos = buf.find(marker)?;
 
-    // Find the start of the enclosing JSON object (walk backwards to find `{`)
-    let line_start = buf[..pos].rfind('{')?;
-
-    // Find the end of the enclosing JSON object
-    let rest = &buf[pos..];
-    let line_end = rest.find('\n').unwrap_or(rest.len());
-    let json_str = &buf[line_start..pos + line_end];
-
-    let val: serde_json::Value = serde_json::from_str(json_str).ok()?;
-    let obj = val.as_object()?;
-
-    // Try "title" then "content" (truncated to 80 chars)
-    if let Some(serde_json::Value::String(s)) = obj.get("title") {
-        let s = s.trim();
-        if !s.is_empty() {
-            let truncated = if s.len() > 80 {
-                format!("{}...", &s[..77])
-            } else {
-                s.to_string()
-            };
-            return Some(truncated);
+    // Try up to 2 chunks (≈ 128 KB) — titles are always near the top
+    for _ in 0..2 {
+        let chunk = reader.by_ref().take(65_536).read_to_string(&mut buf);
+        match chunk {
+            Ok(0) => break, // EOF
+            Ok(n) => {
+                total_read += n;
+                if let Some(pos) = buf[total_read - n..].find(marker) {
+                    let abs_pos = total_read - n + pos;
+                    // Line boundaries around the marker
+                    let line_start = buf[..abs_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                    let line_end = buf[abs_pos..].find('\n').map(|i| abs_pos + i).unwrap_or(buf.len());
+                    let json_line = buf[line_start..line_end].trim();
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_line) {
+                        if let Some(serde_json::Value::String(s)) = val.get("aiTitle") {
+                            let s = s.trim();
+                            if !s.is_empty() {
+                                return Some(if s.len() > 80 {
+                                    format!("{}...", &s[..77])
+                                } else {
+                                    s.to_string()
+                                });
+                            }
+                        }
+                    }
+                    return None; // marker found but no valid title
+                }
+            }
+            Err(_) => break,
         }
     }
-    if let Some(serde_json::Value::String(s)) = obj.get("content") {
-        let s = s.trim();
-        if !s.is_empty() {
-            let truncated = if s.len() > 80 {
-                format!("{}...", &s[..77])
-            } else {
-                s.to_string()
-            };
-            return Some(truncated);
-        }
-    }
-
     None
 }
 
