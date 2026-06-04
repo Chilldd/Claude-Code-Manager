@@ -77,12 +77,8 @@ function App() {
     async (ws: Workspace, worktreeName: string) => {
       setPtyError(null);
       try {
-        const modifiedWs = { ...ws, args: `--worktree ${worktreeName}` };
-        api.debugLog(`launchWorktree: cmd=${modifiedWs.command} args=${modifiedWs.args}`);
-        await launchSession(modifiedWs, worktreeName);
-        api.debugLog("launchWorktree: launchSession completed OK");
+        await launchSession(ws, { type: "worktree", worktreeName });
       } catch (e) {
-        api.debugLog(`launchWorktree FAILED: ${e}`);
         setPtyError(String(e));
       }
     },
@@ -93,14 +89,9 @@ function App() {
     async (ws: Workspace, sessionId: string) => {
       setPtyError(null);
       try {
-        const modifiedWs = { ...ws, args: `--resume ${sessionId}`, auto_prompt: "" };
-        await launchSession(modifiedWs, undefined, sessionId);
+        await launchSession(ws, { type: "resume", sessionId });
       } catch (e) {
         setPtyError(String(e));
-      }
-    },
-    [launchSession]
-  );
       }
     },
     [launchSession]

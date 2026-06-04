@@ -258,16 +258,6 @@ pub fn recent_sessions(workspace_dir: &str, max: usize) -> Vec<SessionSummary> {
                         .duration_since(SystemTime::UNIX_EPOCH)
                         .ok()?
                         .as_millis() as u64;
-
-                    // Skip empty/new sessions (< 3 non-empty lines = just system + init)
-                    let message_count = fs::read_to_string(e.path())
-                        .ok()
-                        .map(|s| s.lines().filter(|l| !l.trim().is_empty()).count())
-                        .unwrap_or(0);
-                    if message_count < 3 {
-                        return None;
-                    }
-
                     Some(SessionSummary {
                         session_id,
                         last_modified,

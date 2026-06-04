@@ -23,6 +23,12 @@ export interface SessionGroup {
 
 export const MAX_GROUP_SIZE = 4;
 
+/** Launch strategy — encapsulates how to compose the final command */
+export type LaunchStrategy =
+  | { type: "normal" }
+  | { type: "worktree"; worktreeName: string }
+  | { type: "resume"; sessionId: string };
+
 /** Compute next group id/name from current groups (safe under StrictMode) */
 export function nextGroupInfo(groups: SessionGroup[]): { id: string; name: string } {
   const maxNum = groups.reduce((max, g) => Math.max(max, parseInt(g.id.replace('g', '')) || 0), 1);

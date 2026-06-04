@@ -6,6 +6,7 @@ import type {
   SessionInfo,
   SessionGroup,
   SessionStatus,
+  LaunchStrategy,
 } from "../types";
 import {
   MAX_GROUP_SIZE,
@@ -44,7 +45,7 @@ export interface SessionManager {
   activeGroupSessionIds: string[];
   activeGroupSessions: SessionInfo[];
 
-  launchSession: (ws: Workspace, worktreeName?: string, resumeSessionId?: string) => Promise<void>;
+  launchSession: (ws: Workspace, strategy?: LaunchStrategy) => Promise<void>;
   stopSession: (sessionId: string) => Promise<void>;
   selectSession: (sessionId: string) => void;
   toggleExpand: (workspaceId: string) => void;
@@ -330,21 +331,44 @@ export function useSessionManager(): SessionManager {
   }, []);
 
   const launchSession = useCallback(
-    async (ws: Workspace, worktreeName?: string, resumeSessionId?: string) => {
+    async (ws: Workspace, strategy?: LaunchStrategy) => {
       const sessionIndex = nextSessionIndex();
       const sessionName = `[${sessionIndex}] ${ws.name}`;
-      const sessionId = resumeSessionId ?? crypto.randomUUID();
-      api.debugLog(`launchSession: calling createPty sid=${sessionId} cmd=${ws.command} args=${ws.args}`);
+
+      // Determine sessionId, inject flag, and worktreeName from strategy
+      let sessionId: string;
+      let injectSessionId: boolean;
+      let worktreeName: string | undefined;
+      let resolvedArgs = ws.args;
+
+      if (strategy?.type === "resume") {
+        sessionId = strategy.sessionId;
+        injectSessionId = false;
+        worktreeName = undefined;
+        resolvedArgs = `--resume ${strategy.sessionId}`;
+      } else if (strategy?.type === "worktree") {
+        sessionId = crypto.randomUUID();
+        injectSessionId = true;
+        worktreeName = strategy.worktreeName;
+        resolvedArgs = `--worktree ${strategy.worktreeName}`;
+      } else {
+        // normal
+        sessionId = crypto.randomUUID();
+        injectSessionId = true;
+        worktreeName = undefined;
+      }
+
+      api.debugLog(`launchSession: calling createPty sid=${sessionId} cmd=${ws.command} args=${resolvedArgs} injectSessionId=${injectSessionId}`);
       try {
         await api.createPty(
           sessionId,
           ws.id,
           sessionName,
           ws.command,
-          ws.args,
+          resolvedArgs,
           ws.path,
           ws.env,
-          resumeSessionId ? false : undefined
+          injectSessionId
         );
         api.debugLog(`launchSession: createPty OK sid=${sessionId}`);
 
@@ -388,7 +412,7 @@ export function useSessionManager(): SessionManager {
         }
         api.debugLog("launchSession: step3 setGroups done");
 
-        if (ws.auto_prompt) {
+        if (ws.auto_prompt && strategy?.type !== "resume") {
           setTimeout(() => {
             api.writePty(sessionId, ws.auto_prompt + "\n").catch(() => {});
           }, 1500);
