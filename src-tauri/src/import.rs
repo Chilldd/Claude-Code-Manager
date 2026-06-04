@@ -235,6 +235,7 @@ pub struct SessionSummary {
 }
 
 /// Return the most recent session `.jsonl` files for a workspace directory.
+/// Skips empty/new sessions that have fewer than `min_messages` meaningful lines.
 pub fn recent_sessions(workspace_dir: &str, max: usize) -> Vec<SessionSummary> {
     let mut dir = claude_projects_dir();
     dir.push(encode_folder_name(workspace_dir));
@@ -250,14 +251,23 @@ pub fn recent_sessions(workspace_dir: &str, max: usize) -> Vec<SessionSummary> {
                 .filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl"))
                 .filter_map(|e| {
                     let session_id = e.path().file_stem()?.to_string_lossy().to_string();
-                    let last_modified = e
-                        .metadata()
-                        .ok()?
+                    let meta = e.metadata().ok()?;
+                    let last_modified = meta
                         .modified()
                         .ok()?
                         .duration_since(SystemTime::UNIX_EPOCH)
                         .ok()?
                         .as_millis() as u64;
+
+                    // Skip empty/new sessions (< 3 non-empty lines = just system + init)
+                    let message_count = fs::read_to_string(e.path())
+                        .ok()
+                        .map(|s| s.lines().filter(|l| !l.trim().is_empty()).count())
+                        .unwrap_or(0);
+                    if message_count < 3 {
+                        return None;
+                    }
+
                     Some(SessionSummary {
                         session_id,
                         last_modified,
