@@ -45,6 +45,8 @@ export function useSessionManager(): SessionManager {
   const [activeGroupId, setActiveGroupId] = useState<string>("g1");
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
+  const activeGroupIdRef = useRef(activeGroupId);
+  activeGroupIdRef.current = activeGroupId;
 
   // Module-level mutable counter becomes a ref
   const sessionCounterRef = useRef(0);
@@ -77,38 +79,42 @@ export function useSessionManager(): SessionManager {
     let prevStatusMap = new Map<string, SessionStatus>();
 
     const unlisten = onPtyTitle((payload) => {
-      setSessions((prev) => {
-        const session = prev.find((s) => s.id === payload.session_id);
-        if (!session) return prev;
+      // Read session from ref (latest committed state) to determine transition
+      const session = sessionsRef.current.find((s) => s.id === payload.session_id);
+      if (!session) return;
 
-        const newStatus = inferStatus(payload.title);
-        const oldStatus = prevStatusMap.get(payload.session_id);
-        prevStatusMap.set(payload.session_id, newStatus);
+      const newStatus = inferStatus(payload.title);
+      const oldStatus = prevStatusMap.get(payload.session_id);
+      prevStatusMap.set(payload.session_id, newStatus); // <-- side effect, ok outside updater
 
-        // Task complete: thinking → idle → fire system notification
-        if (oldStatus === "thinking" && newStatus === "idle") {
-          notifySession({
-            title: "✅ Task Complete",
-            sessionName: session.name,
-            workspaceName: session.workspaceName,
-            sessionId: session.id,
-          });
-          return prev.map((s) =>
+      // Task complete: thinking → idle → fire system notification
+      if (oldStatus === "thinking" && newStatus === "idle") {
+        notifySession({                                // <-- side effect, ok outside updater
+          title: "✅ Task Complete",
+          sessionName: session.name,
+          workspaceName: session.workspaceName,
+          sessionId: session.id,
+        });
+        setSessions((prev) =>
+          prev.map((s) =>
             s.id === payload.session_id
               ? { ...s, name: `[${s.sessionIndex}] ${payload.title}`, status: "attention" as const }
               : s
-          );
-        }
+          )
+        );
+        return;
+      }
 
-        return prev.map((s) =>
+      setSessions((prev) =>
+        prev.map((s) =>
           s.id === payload.session_id
             ? { ...s, name: `[${s.sessionIndex}] ${payload.title}`, status: newStatus }
             : s
-        );
-      });
+        )
+      );
     });
     return () => {
-      unlisten.then((fn) => fn());
+      unlisten.then((fn) => fn()).catch(() => {});
     };
   }, []);
 
@@ -128,7 +134,7 @@ export function useSessionManager(): SessionManager {
       });
     });
     return () => {
-      unlisten.then((fn) => fn());
+      unlisten.then((fn) => fn()).catch(() => {});
     };
   }, []);
 
@@ -165,7 +171,7 @@ export function useSessionManager(): SessionManager {
       );
     });
     return () => {
-      unlisten.then((fn) => fn());
+      unlisten.then((fn) => fn()).catch(() => {});
     };
   }, []);
 
@@ -189,7 +195,7 @@ export function useSessionManager(): SessionManager {
       });
     });
     return () => {
-      unlisten.then((fn) => fn());
+      unlisten.then((fn) => fn()).catch(() => {});
     };
   }, []);
 
@@ -275,21 +281,22 @@ export function useSessionManager(): SessionManager {
         api.debugLog("launchSession: step2 done");
 
         api.debugLog("launchSession: step3 setGroups");
-        setGroups((prev) => {
-          const idx = prev.findIndex((g) => g.id === activeGroupId);
-          if (idx >= 0 && prev[idx].sessionIds.length < MAX_GROUP_SIZE) {
-            const copy = prev.map((g) =>
-              g.id === activeGroupId
+        // Read the latest active group via ref — user may have switched groups during the await
+        const currentGroup = groups.find((g) => g.id === activeGroupIdRef.current);
+        const effectiveGroupId = activeGroupIdRef.current;
+        if (currentGroup && currentGroup.sessionIds.length < MAX_GROUP_SIZE) {
+          setGroups((prev) =>
+            prev.map((g) =>
+              g.id === effectiveGroupId
                 ? { ...g, sessionIds: [...g.sessionIds, sessionId] }
                 : g
-            );
-            return copy;
-          }
-          const { id, name } = nextGroupInfo(prev);
-          const newGroup: SessionGroup = { id, name, sessionIds: [sessionId] };
-          setActiveGroupId(newGroup.id);
-          return [...prev, newGroup];
-        });
+            )
+          );
+        } else {
+          const { id, name } = nextGroupInfo(groups);
+          setGroups((prev) => [...prev, { id, name, sessionIds: [sessionId] }]);
+          setActiveGroupId(id);
+        }
         api.debugLog("launchSession: step3 setGroups done");
 
         if (ws.auto_prompt) {
@@ -316,39 +323,53 @@ export function useSessionManager(): SessionManager {
       await api.killPty(sessionId);
     } catch { /* ignore */ }
 
-    // Determine next selection before state updates
-    let nextSelectedId: string | null = null;
+    // Compute what happens to groups when this session is removed
+    const remainingGroups = groups
+      .map((g) => ({ ...g, sessionIds: g.sessionIds.filter((id) => id !== sessionId) }))
+      .filter((g) => g.sessionIds.length > 0);
+    const activeGroupDestroyed = !remainingGroups.some((g) => g.id === activeGroupId);
+
+    // Determine the final selected session ID (single call, no double-write)
+    let finalSelectedId: string | null;
     if (selectedSessionId === sessionId) {
-      const activeGroup = groups.find((g) => g.id === activeGroupId);
-      const remaining = activeGroup?.sessionIds.filter((id) => id !== sessionId) ?? [];
-      if (remaining.length > 0) {
-        nextSelectedId = remaining[0];
+      // The selected session is being removed
+      if (activeGroupDestroyed && remainingGroups.length > 0) {
+        // The active group is gone too — pick fallback group's first session
+        finalSelectedId = remainingGroups[0].sessionIds[0] ?? null;
+      } else if (!activeGroupDestroyed) {
+        // Same group still exists — pick the next sibling
+        const activeGroup = groups.find((g) => g.id === activeGroupId);
+        const remaining = activeGroup?.sessionIds.filter((id) => id !== sessionId) ?? [];
+        finalSelectedId = remaining.length > 0 ? remaining[0] : null;
+      } else {
+        finalSelectedId = null;
       }
+    } else {
+      finalSelectedId = selectedSessionId;
     }
 
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    setSelectedSessionId((prev) => (prev === sessionId ? nextSelectedId : prev));
+    setSelectedSessionId(finalSelectedId);
 
-    setGroups((prev) => {
-      let updated = prev
-        .map((g) => ({ ...g, sessionIds: g.sessionIds.filter((id) => id !== sessionId) }))
-        .filter((g) => g.sessionIds.length > 0);
-      if (!updated.some((g) => g.id === activeGroupId)) {
-        // Active group is gone — switch to the first remaining group
-        if (updated.length > 0) {
-          setActiveGroupId(updated[0].id);
-          // If we didn't already pick a next session, select the first of the new group
-          if (nextSelectedId === null && updated[0].sessionIds.length > 0) {
-            setSelectedSessionId(updated[0].sessionIds[0]);
-          }
-        } else {
-          const fresh: SessionGroup = { id: 'g1', name: 'Group 1', sessionIds: [] };
-          setActiveGroupId(fresh.id);
-          updated = [fresh];
-        }
+    // Handle fallback if active group is gone
+    if (activeGroupDestroyed) {
+      if (remainingGroups.length > 0) {
+        setActiveGroupId(remainingGroups[0].id);
+        setGroups(remainingGroups);
+      } else {
+        setActiveGroupId('g1');
+        setGroups([{ id: 'g1', name: 'Group 1', sessionIds: [] }]);
       }
-      return updated;
-    });
+    } else {
+      // Apply groups state via updater (fresh computation from latest committed state)
+      setGroups((prev) => {
+        const filtered = prev
+          .map((g) => ({ ...g, sessionIds: g.sessionIds.filter((id) => id !== sessionId) }))
+          .filter((g) => g.sessionIds.length > 0);
+        if (filtered.length > 0) return filtered;
+        return [{ id: 'g1', name: 'Group 1', sessionIds: [] }];
+      });
+    }
   }, [activeGroupId, groups, selectedSessionId]);
 
   const switchGroup = useCallback((groupId: string) => {
@@ -367,28 +388,34 @@ export function useSessionManager(): SessionManager {
   }, []);
 
   const moveSessionToGroup = useCallback((sessionId: string, targetGroupId: string) => {
-    setGroups((prev) => {
-      const src = prev.find((g) => g.sessionIds.includes(sessionId));
-      const tgt = prev.find((g) => g.id === targetGroupId);
-      if (!src || !tgt || src.id === tgt.id) return prev;
-      if (tgt.sessionIds.length >= MAX_GROUP_SIZE) return prev;
-      return prev.map((g) => {
-        if (g.id === src.id) return { ...g, sessionIds: g.sessionIds.filter((id) => id !== sessionId) };
-        if (g.id === targetGroupId) return { ...g, sessionIds: [...g.sessionIds, sessionId] };
-        return g;
-      });
-    });
-  }, []);
+    const src = groups.find((g) => g.sessionIds.includes(sessionId));
+    const tgt = groups.find((g) => g.id === targetGroupId);
+    if (!src || !tgt || src.id === tgt.id) return;
+    if (tgt.sessionIds.length >= MAX_GROUP_SIZE) return;
+
+    setGroups((prev) => prev.map((g) => {
+      if (g.id === src.id) return { ...g, sessionIds: g.sessionIds.filter((id) => id !== sessionId) };
+      if (g.id === targetGroupId) return { ...g, sessionIds: [...g.sessionIds, sessionId] };
+      return g;
+    }));
+
+    // If the moved session was selected and is leaving the active group, select a sibling
+    if (sessionId === selectedSessionId && src.id === activeGroupId) {
+      const remaining = src.sessionIds.filter((id) => id !== sessionId);
+      if (remaining.length > 0) {
+        setSelectedSessionId(remaining[0]);
+      } else {
+        setSelectedSessionId(null);
+      }
+    }
+  }, [groups, activeGroupId, selectedSessionId]);
 
   const addGroup = useCallback(() => {
+    const { id, name } = nextGroupInfo(groups);
     setSelectedSessionId(null);
-    setGroups((prev) => {
-      const { id, name } = nextGroupInfo(prev);
-      const newGroup: SessionGroup = { id, name, sessionIds: [] };
-      setActiveGroupId(newGroup.id);
-      return [...prev, newGroup];
-    });
-  }, []);
+    setGroups((prev) => [...prev, { id, name, sessionIds: [] }]);
+    setActiveGroupId(id);
+  }, [groups]);
 
   const deleteGroup = useCallback((groupId: string) => {
     const group = groups.find((g) => g.id === groupId);
@@ -398,25 +425,30 @@ export function useSessionManager(): SessionManager {
         api.killPty(sid).catch(() => {});
       }
       setSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
-      setSelectedSessionId((prev) => (ids.includes(prev ?? '') ? null : prev));
     }
-    setGroups((prev) => {
-      const updated = prev.filter((g) => g.id !== groupId);
-      if (updated.length === 0) {
-        const fresh = { id: 'g1', name: 'Group 1', sessionIds: [] };
-        setActiveGroupId(fresh.id);
-        return [fresh];
+
+    const sessionInDeletedGroup = group?.sessionIds.includes(selectedSessionId ?? '') ?? false;
+    const remainingGroups = groups.filter((g) => g.id !== groupId);
+    const activeGroupDeleted = group?.id === activeGroupId;
+
+    if (remainingGroups.length === 0) {
+      setGroups([{ id: 'g1', name: 'Group 1', sessionIds: [] }]);
+      setActiveGroupId('g1');
+      setSelectedSessionId(sessionInDeletedGroup ? null : selectedSessionId);
+    } else {
+      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+      if (activeGroupDeleted) {
+        setActiveGroupId(remainingGroups[0].id);
+        setSelectedSessionId(
+          remainingGroups[0].sessionIds.length > 0
+            ? remainingGroups[0].sessionIds[0]
+            : (sessionInDeletedGroup ? null : selectedSessionId)
+        );
+      } else if (sessionInDeletedGroup) {
+        setSelectedSessionId(null);
       }
-      if (!updated.some((g) => g.id === activeGroupId)) {
-        setActiveGroupId(updated[0].id);
-        // Select the first session of the new active group
-        if (updated[0].sessionIds.length > 0) {
-          setSelectedSessionId(updated[0].sessionIds[0]);
-        }
-      }
-      return updated;
-    });
-  }, [groups, activeGroupId]);
+    }
+  }, [groups, activeGroupId, selectedSessionId]);
 
   return {
     sessions,

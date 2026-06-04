@@ -63,6 +63,11 @@ export function TerminalPanel() {
   const pendingOutputRef = useRef<Map<string, string[]>>(new Map());
   const onSelectRef = useRef(selectSession);
   onSelectRef.current = selectSession;
+  // Tracks the last grid layout key; when unchanged, skip Step 6 (fit/refresh/focus)
+  // to avoid focus theft on session metadata-only changes (e.g. PTY title).
+  const prevGridKeyRef = useRef<string>("");
+  // Tracks last-known PTY dimensions per session to skip redundant resizePty calls.
+  const lastDimsRef = useRef<Map<string, { cols: number; rows: number }>>(new Map());
 
   // Per-group split mode. Defaults to true (split) for any group.
   const [splitModes, setSplitModes] = useState<Record<string, boolean>>({});
@@ -139,7 +144,7 @@ export function TerminalPanel() {
       : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
     const count = visibleIds.length;
 
-    // ── 3. Apply layout + show/hide ──
+    // ── 3. Apply root grid layout ──
     if (count === 0) {
       root.className = "terminal-container";
       root.style.display = "";
@@ -157,32 +162,13 @@ export function TerminalPanel() {
       }
     }
 
-    for (const [sid, inst] of instances) {
-      const i = visibleIds.indexOf(sid);
-      const visible = i >= 0;
-      inst.container.style.display = visible ? "block" : "none";
-      if (visible && count === 3 && i === 0) {
-        inst.container.style.gridRow = "1 / 3";
-      } else {
-        inst.container.style.gridRow = "";
-      }
-      inst.container.style.gridColumn = "";
-      inst.container.classList.toggle("active", sid === selectedSessionId);
-      inst.container.style.outline = sid === selectedSessionId ? "1px solid #60cdff" : "";
-    }
-
-    // ── 4. Create xterm for new sessions ──
+    // ── 4. Create xterm instances for new sessions ──
     for (const session of sessions) {
       if (instances.has(session.id)) continue;
 
       const container = document.createElement("div");
       container.className = "term-instance";
       container.dataset.sid = session.id;
-      const i = visibleIds.indexOf(session.id);
-      container.style.display = i >= 0 ? "block" : "none";
-      if (i >= 0 && count === 3 && i === 0) container.style.gridRow = "1 / 3";
-      container.classList.toggle("active", session.id === selectedSessionId);
-      container.style.outline = session.id === selectedSessionId ? "1px solid #60cdff" : "";
       root.appendChild(container);
 
       const term = new Terminal({
@@ -194,7 +180,7 @@ export function TerminalPanel() {
       });
 
       term.attachCustomKeyEventHandler((e) => {
-        if (e.type === "keydown" && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === "v") {
+        if (e.type === "keydown" && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "v") {
           e.preventDefault();
           navigator.clipboard.readText().then((t) => api.writePty(session.id, t).catch(() => {})).catch(() => {});
           return false;
@@ -225,8 +211,29 @@ export function TerminalPanel() {
       }
     }
 
-    // ── 5. Fit + refresh + focus on the session whose size changed ──
-    if (count > 0) {
+    // ── 5. Apply visual style (display/gridRow/active/outline) to ALL instances ──
+    for (const [sid, inst] of instances) {
+      const i = visibleIds.indexOf(sid);
+      const visible = i >= 0;
+      inst.container.style.display = visible ? "block" : "none";
+      if (visible && count === 3 && i === 0) {
+        inst.container.style.gridRow = "1 / 3";
+      } else {
+        inst.container.style.gridRow = "";
+      }
+      inst.container.style.gridColumn = "";
+      inst.container.classList.toggle("active", sid === selectedSessionId);
+      inst.container.style.outline = sid === selectedSessionId ? "1px solid #60cdff" : "";
+    }
+
+    // ── 6. Fit + refresh + focus — only when grid layout changed ──
+    // Guard: skip on metadata-only changes (PTY title, session status) to
+    // avoid stealing focus from non-terminal inputs.
+    const gridKey = count + "|" + (count > 0 ? visibleIds.join("|") : "");
+    const gridChanged = gridKey !== prevGridKeyRef.current;
+    prevGridKeyRef.current = gridKey;
+
+    if (gridChanged && count > 0) {
       void root.offsetHeight;
       for (const sid of visibleIds) {
         const inst = instances.get(sid);
@@ -234,18 +241,29 @@ export function TerminalPanel() {
         try {
           inst.fitAddon.fit();
           const dims = inst.fitAddon.proposeDimensions();
-          if (dims) api.resizePty(sid, dims.cols, dims.rows).catch(() => {});
+          if (dims) {
+            const prevDims = lastDimsRef.current.get(sid);
+            if (!prevDims || prevDims.cols !== dims.cols || prevDims.rows !== dims.rows) {
+              api.resizePty(sid, dims.cols, dims.rows).catch(() => {});
+              lastDimsRef.current.set(sid, { cols: dims.cols, rows: dims.rows });
+            }
+          }
           inst.term.refresh(0, inst.term.rows - 1);
-        } catch { /* ignore */ }
+        } catch (e) {
+          api.debugLog(`[TerminalPanel] fit/refresh error in LayoutEffect sid=${sid}: ${e}`);
+        }
       }
       // Focus the first visible terminal — its container just got a new grid
       // span (gridRow: 1/3 → 100 % height) and focus() triggers xterm's
       // internal redraw, ensuring canvas catches up.
+      // NOTE: if the textarea is already focused (user typing in this terminal),
+      // focus() is a no-op and sync redraw is skipped. In practice the canvas
+      // was already updated by fit() → term.resize() so the impact is minimal.
       const first = instances.get(visibleIds[0]);
       if (first) first.term.focus();
     }
 
-    // ── 6. IME guard ──
+    // ── 7. IME guard ──
     for (const [sid, inst] of instances) {
       let overlay = inst.container.querySelector(".term-ime-guard") as HTMLDivElement | null;
       if (sid === selectedSessionId) {
@@ -255,10 +273,12 @@ export function TerminalPanel() {
         overlay.className = "term-ime-guard";
         overlay.addEventListener("click", (e) => { e.stopPropagation(); onSelectRef.current(sid); });
         inst.container.appendChild(overlay);
+      } else if (!visibleIds.includes(sid) && overlay) {
+        overlay.remove();
       }
     }
 
-    // ── 7. Focus after render settles ──
+    // ── 8. Focus after render settles ──
     if (selectedSessionId && visibleIds.includes(selectedSessionId)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -288,9 +308,17 @@ export function TerminalPanel() {
           try {
             inst.fitAddon.fit();
             const dims = inst.fitAddon.proposeDimensions();
-            if (dims) api.resizePty(sid, dims.cols, dims.rows).catch(() => {});
+            if (dims) {
+              const prevDims = lastDimsRef.current.get(sid);
+              if (!prevDims || prevDims.cols !== dims.cols || prevDims.rows !== dims.rows) {
+                api.resizePty(sid, dims.cols, dims.rows).catch(() => {});
+                lastDimsRef.current.set(sid, { cols: dims.cols, rows: dims.rows });
+              }
+            }
             inst.term.refresh(0, inst.term.rows - 1);
-          } catch { /* ignore */ }
+          } catch (e) {
+            api.debugLog(`[TerminalPanel] fit/refresh error in ResizeObserver sid=${sid}: ${e}`);
+          }
         }
       }, 250);
     });
@@ -305,9 +333,10 @@ export function TerminalPanel() {
   // ── Global keyboard shortcuts ──
   useEffect(() => {
     const onCapture = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      const cl = (e.target as HTMLElement)?.classList;
-      const isInput = (tag === "INPUT" || tag === "TEXTAREA") && !cl?.contains("xterm-helper-textarea");
+      const target = e.target;
+      const isInput = target instanceof Element && (
+        target.tagName === "INPUT" || target.tagName === "TEXTAREA"
+      ) && !target.classList.contains("xterm-helper-textarea");
       if (isInput) return;
 
       if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {

@@ -10,12 +10,12 @@
 
 | 会话数 | 布局方式 | 说明 |
 |--------|----------|------|
-| 1 | flex row | `grid-template-columns: 1fr` |
-| 2 | flex row | `grid-template-columns: 1fr 1fr` |
+| 1 | CSS Grid | `grid-template-columns: 1fr` |
+| 2 | CSS Grid | `grid-template-columns: 1fr 1fr` |
 | 3 | CSS Grid 2×2 | 第一个容器 `grid-row: 1 / 3` 占左列 100% 高度，其余占右列 |
-| 4 | CSS Grid 2×2 | 四等分自动填充 |
+| 4 | CSS Grid 2×2 | `grid-template-columns: 1fr 1fr`; `grid-template-rows: 1fr 1fr` |
 
-3 会话时没有使用嵌套容器，直接通过 `grid-row: 1 / 3` 实现左列全高，这是目前唯一用到 CSS Grid span 的场景。
+3 会话时没有使用嵌套容器，直接通过 `grid-row: 1 / 3` 实现左列全高，这是目前唯一用到 CSS Grid span 的场景。1-2 会话同样使用 CSS Grid（`display: grid` via `.terminal-container.split-mode`），而非 Flexbox。
 
 ## 生命周期（`useLayoutEffect`）
 
