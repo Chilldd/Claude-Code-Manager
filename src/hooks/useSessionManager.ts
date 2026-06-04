@@ -59,6 +59,8 @@ export function useSessionManager(): SessionManager {
   const [activeGroupId, setActiveGroupId] = useState<string>("g1");
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
+  const groupsRef = useRef(groups);
+  groupsRef.current = groups;
   const activeGroupIdRef = useRef(activeGroupId);
   activeGroupIdRef.current = activeGroupId;
 
@@ -354,20 +356,21 @@ export function useSessionManager(): SessionManager {
         setSelectedSessionId(sessionId);
         api.debugLog("launchSession: step2 done");
 
+        // Step 3/4: assign session to a group
+        // 使用 ref 读取最新 groups，避免 useCallback 闭包捕获过期值
         api.debugLog("launchSession: step3 setGroups");
-        // Read the latest active group via ref — user may have switched groups during the await
-        const currentGroup = groups.find((g) => g.id === activeGroupIdRef.current);
-        const effectiveGroupId = activeGroupIdRef.current;
+        const latestGroups = groupsRef.current;
+        const currentGroup = latestGroups.find((g) => g.id === activeGroupIdRef.current);
         if (currentGroup && currentGroup.sessionIds.length < MAX_GROUP_SIZE) {
           setGroups((prev) =>
             prev.map((g) =>
-              g.id === effectiveGroupId
+              g.id === currentGroup.id
                 ? { ...g, sessionIds: [...g.sessionIds, sessionId] }
                 : g
             )
           );
         } else {
-          const { id, name } = nextGroupInfo(groups);
+          const { id, name } = nextGroupInfo(latestGroups);
           setGroups((prev) => [...prev, { id, name, sessionIds: [sessionId] }]);
           setActiveGroupId(id);
         }
@@ -384,7 +387,7 @@ export function useSessionManager(): SessionManager {
         // notifySession hook placeholder
       }
     },
-    [activeGroupId, nextSessionIndex]
+    [nextSessionIndex]
   );
 
   const stopSession = useCallback(async (sessionId: string) => {
