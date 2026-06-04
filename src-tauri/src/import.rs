@@ -220,6 +220,50 @@ fn extract_cwd_from_raw(content: &str, marker: &str) -> Option<String> {
     }
 }
 
+/// Try to extract a session title from the first line of a `.jsonl` file.
+/// Claude Code stores conversation metadata in the first JSON line — look for
+/// a `title` or `name` field, falling back to the first user `content`.
+fn extract_session_title(path: &Path) -> Option<String> {
+    let file = fs::File::open(path).ok()?;
+    let mut reader = BufReader::new(file);
+    let mut first_line = String::new();
+    reader.read_line(&mut first_line).ok()?;
+    let trimmed = first_line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let val: serde_json::Value = serde_json::from_str(trimmed).ok()?;
+    let obj = val.as_object()?;
+
+    // Prefer explicit title field
+    if let Some(serde_json::Value::String(s)) = obj.get("title") {
+        if !s.is_empty() {
+            return Some(s.clone());
+        }
+    }
+    if let Some(serde_json::Value::String(s)) = obj.get("name") {
+        if !s.is_empty() {
+            return Some(s.clone());
+        }
+    }
+
+    // Fall back to first user message content (truncated)
+    if let Some(serde_json::Value::String(s)) = obj.get("content") {
+        let s = s.trim();
+        if !s.is_empty() {
+            let truncated = if s.len() > 80 {
+                format!("{}...", &s[..77])
+            } else {
+                s.to_string()
+            };
+            return Some(truncated);
+        }
+    }
+
+    None
+}
+
 /// Encode a filesystem path to a Claude Code project folder name.
 /// `D:\WorkSpace\YuG\agent\yug-cc-manager` → `D--WorkSpace-YuG-agent-yug-cc-manager`
 pub fn encode_folder_name(path: &str) -> String {
@@ -230,12 +274,14 @@ pub fn encode_folder_name(path: &str) -> String {
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionSummary {
     pub session_id: String,
+    /// Session title (from Claude Code conversation metadata)
+    pub title: String,
     /// Unix timestamp (milliseconds) of last modification
     pub last_modified: u64,
 }
 
-/// Return the most recent session `.jsonl` files for a workspace directory.
-/// Skips empty/new sessions that have fewer than `min_messages` meaningful lines.
+/// Return the most recent session `.jsonl` files for a workspace directory,
+/// ordered by modification time (newest first).
 pub fn recent_sessions(workspace_dir: &str, max: usize) -> Vec<SessionSummary> {
     let mut dir = claude_projects_dir();
     dir.push(encode_folder_name(workspace_dir));
@@ -258,8 +304,13 @@ pub fn recent_sessions(workspace_dir: &str, max: usize) -> Vec<SessionSummary> {
                         .duration_since(SystemTime::UNIX_EPOCH)
                         .ok()?
                         .as_millis() as u64;
+
+                    // Read first line for session title
+                    let title = extract_session_title(&e.path()).unwrap_or_default();
+
                     Some(SessionSummary {
                         session_id,
+                        title,
                         last_modified,
                     })
                 })

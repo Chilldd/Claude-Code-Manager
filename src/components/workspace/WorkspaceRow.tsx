@@ -61,7 +61,7 @@ export function WorkspaceRow({
 
   // ── Recent session history from Claude Code project files ──
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [recentSessions, setRecentSessions] = useState<{ session_id: string; last_modified: number }[] | null>(null);
+  const [recentSessions, setRecentSessions] = useState<{ session_id: string; title: string; last_modified: number }[] | null>(null);
 
   useEffect(() => {
     if (!isExpanded) return;
@@ -196,10 +196,10 @@ export function WorkspaceRow({
                   key={h.session_id}
                   className={styles.historyItem}
                   onClick={() => onResumeSession(h.session_id)}
-                  title="恢复此会话"
+                  title={h.title ? `恢复: ${h.title}` : "恢复此会话"}
                 >
                   <span className={styles.historyIcon}>↻</span>
-                  <span className={styles.historyName}>{workspace.name}</span>
+                  <span className={styles.historyName}>{h.title || workspace.name}</span>
                   <span className={styles.historyTime}>{formatRelativeTime(h.last_modified)}</span>
                 </div>
               ))}
