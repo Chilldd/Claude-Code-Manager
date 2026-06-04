@@ -29,6 +29,12 @@ function mapAgentStatus(info: ClaudeAgentInfo): SessionStatus | undefined {
   }
 }
 
+/** Whether the agent's "waiting" reason is a real permission request (needs user notification) */
+function isAgentPermissionPrompt(waitingFor?: string): boolean {
+  if (!waitingFor) return false;
+  return waitingFor.toLowerCase().includes("permission");
+}
+
 export interface SessionManager {
   sessions: SessionInfo[];
   selectedSessionId: string | null;
@@ -172,8 +178,13 @@ export function useSessionManager(): SessionManager {
             )
           );
 
-          // Permission-prompt notification (display just became "waiting")
-          if (next === "waiting" && cfg.notification.permission_prompt) {
+          // Permission-prompt notification — only when waitingFor indicates a
+          // real permission request, not generic "dialog open" or other waits
+          if (
+            next === "waiting"
+            && cfg.notification.permission_prompt
+            && isAgentPermissionPrompt(info.waiting_for)
+          ) {
             notifySession({
               title: "⚡ 需要授权",
               sessionName: session.name,
