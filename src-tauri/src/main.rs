@@ -83,8 +83,10 @@ fn create_pty(
     args: String,
     cwd: String,
     env: std::collections::HashMap<String, String>,
+    inject_session_id: Option<bool>,
 ) -> Result<String, AppError> {
     debug_log(format!("create_pty: sid={}, cmd={}, args={}, cwd={}", &session_id, command, args, cwd));
+    let inject = inject_session_id.unwrap_or(true);
 
     let mut pty = state.pty.lock().map_err(|e| {
         let msg = format!("pty lock: {}", e);
@@ -101,6 +103,7 @@ fn create_pty(
         &args,
         &cwd,
         env,
+        inject,
     ).map_err(|e| {
         debug_log(format!("pty.create FAILED: {}", e));
         AppError::PtyError(e)

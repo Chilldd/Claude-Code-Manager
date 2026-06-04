@@ -117,8 +117,8 @@ export const api = {
   reorderWorkspaces: (ids: string[]) =>
     invoke<Workspace[]>("reorder_workspaces", { ids }),
 
-  createPty: (sessionId: string, workspaceId: string, sessionName: string, command: string, args: string, cwd: string, env: Record<string, string>) =>
-    invoke<string>("create_pty", { sessionId, workspaceId, sessionName, command, args, cwd, env }),
+  createPty: (sessionId: string, workspaceId: string, sessionName: string, command: string, args: string, cwd: string, env: Record<string, string>, injectSessionId?: boolean) =>
+    invoke<string>("create_pty", { sessionId, workspaceId, sessionName, command, args, cwd, env, injectSessionId }),
   writePty: (sessionId: string, data: string) =>
     invoke<void>("write_pty", { sessionId, data }),
   resizePty: (sessionId: string, cols: number, rows: number) =>

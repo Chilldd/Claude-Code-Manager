@@ -343,7 +343,8 @@ export function useSessionManager(): SessionManager {
           ws.command,
           ws.args,
           ws.path,
-          ws.env
+          ws.env,
+          resumeSessionId ? false : undefined
         );
         api.debugLog(`launchSession: createPty OK sid=${sessionId}`);
 

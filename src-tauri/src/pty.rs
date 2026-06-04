@@ -159,12 +159,15 @@ impl PtyManager {
         args: &str,
         cwd: &str,
         env: HashMap<String, String>,
+        inject_session_id: bool,
     ) -> Result<(String, Vec<u32>), String> {
         let mut args = parse_args(args);
 
-        // Inject --session-id so the spawned process can identify itself
-        args.push("--session-id".to_string());
-        args.push(session_id.to_string());
+        // Inject --session-id so the spawned process can identify itself.
+        if inject_session_id {
+            args.push("--session-id".to_string());
+            args.push(session_id.to_string());
+        }
 
         let pty_system = NativePtySystem::default();
         let pair = pty_system
