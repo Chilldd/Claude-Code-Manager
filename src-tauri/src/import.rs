@@ -2,7 +2,7 @@ use crate::{log::debug_log, workspace};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -220,35 +220,41 @@ fn extract_cwd_from_raw(content: &str, marker: &str) -> Option<String> {
     }
 }
 
-/// Try to extract a session title from the first line of a `.jsonl` file.
-/// Claude Code stores conversation metadata in the first JSON line — look for
-/// a `title` or `name` field, falling back to the first user `content`.
+/// Try to extract a session title from a `.jsonl` conversation file.
+/// Claude Code stores the AI-generated title in a JSON line with
+/// `"type":"ai-title"` — scan the file (first 64 KB) for it.
 fn extract_session_title(path: &Path) -> Option<String> {
     let file = fs::File::open(path).ok()?;
-    let mut reader = BufReader::new(file);
-    let mut first_line = String::new();
-    reader.read_line(&mut first_line).ok()?;
-    let trimmed = first_line.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
+    let mut reader = BufReader::with_capacity(65_536, file);
+    let mut buf = String::new();
+    reader.read_to_string(&mut buf).ok()?;
 
-    let val: serde_json::Value = serde_json::from_str(trimmed).ok()?;
+    let marker = r#""type":"ai-title""#;
+    let pos = buf.find(marker)?;
+
+    // Find the start of the enclosing JSON object (walk backwards to find `{`)
+    let line_start = buf[..pos].rfind('{')?;
+
+    // Find the end of the enclosing JSON object
+    let rest = &buf[pos..];
+    let line_end = rest.find('\n').unwrap_or(rest.len());
+    let json_str = &buf[line_start..pos + line_end];
+
+    let val: serde_json::Value = serde_json::from_str(json_str).ok()?;
     let obj = val.as_object()?;
 
-    // Prefer explicit title field
+    // Try "title" then "content" (truncated to 80 chars)
     if let Some(serde_json::Value::String(s)) = obj.get("title") {
+        let s = s.trim();
         if !s.is_empty() {
-            return Some(s.clone());
+            let truncated = if s.len() > 80 {
+                format!("{}...", &s[..77])
+            } else {
+                s.to_string()
+            };
+            return Some(truncated);
         }
     }
-    if let Some(serde_json::Value::String(s)) = obj.get("name") {
-        if !s.is_empty() {
-            return Some(s.clone());
-        }
-    }
-
-    // Fall back to first user message content (truncated)
     if let Some(serde_json::Value::String(s)) = obj.get("content") {
         let s = s.trim();
         if !s.is_empty() {
