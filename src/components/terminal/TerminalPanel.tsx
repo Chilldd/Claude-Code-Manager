@@ -172,9 +172,10 @@ export function TerminalPanel() {
       root.appendChild(container);
 
       const term = new Terminal({
-        cursorBlink: true, cursorStyle: "bar", cursorInactiveStyle: "none", cursorWidth: 2,
-        fontSize: 14, lineHeight: 1.2,
+        cursorBlink: true, cursorStyle: "block", cursorInactiveStyle: "none", cursorWidth: 2,
+        fontSize: 15, lineHeight: 1.35,
         fontFamily: "'Cascadia Code', 'Cascadia Mono', 'Consolas', 'Courier New', monospace",
+        fontWeight: "400", fontWeightBold: "700",
         theme: TERM_THEME, allowTransparency: false, drawBoldTextInBrightColors: true,
         letterSpacing: 0,
       });

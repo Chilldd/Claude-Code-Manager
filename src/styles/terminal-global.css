@@ -43,7 +43,7 @@
 /* xterm overrides */
 .xterm {
   height: 100%;
-  padding: 4px;
+  padding: 0;
 }
 
 .xterm-viewport {
