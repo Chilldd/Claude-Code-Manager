@@ -42,49 +42,6 @@ interface TermInstance {
   container: HTMLDivElement;
 }
 
-interface GridLayout {
-  cols: string;
-  rows: string;
-  /** Per-item CSS overrides (gridRow/gridColumn) for custom placement. */
-  positions: { gridRow?: string; gridColumn?: string }[];
-}
-
-/** Compute grid columns/rows based on item count */
-function getGridLayout(n: number): GridLayout {
-  if (n <= 1) return { cols: "1fr", rows: "1fr", positions: [] };
-  if (n === 2) return { cols: "1fr 1fr", rows: "1fr", positions: [] };
-  if (n === 3) {
-    return {
-      cols: "1fr 1fr",
-      rows: "1fr 1fr",
-      positions: [{ gridRow: "1 / 3" }, {}, {}],
-    };
-  }
-  if (n <= 4) return { cols: "1fr 1fr", rows: "1fr 1fr", positions: [] };
-  return { cols: "1fr 1fr", rows: "1fr 1fr", positions: [] };
-}
-
-/** Refit visible terminals */
-function refitVisible(
-  sessionIds: string[],
-  instances: Map<string, TermInstance>,
-) {
-  for (const sid of sessionIds) {
-    const inst = instances.get(sid);
-    if (!inst) continue;
-    try {
-      const oldCols = inst.term.cols;
-      const oldRows = inst.term.rows;
-      inst.fitAddon.fit();
-      const dims = inst.fitAddon.proposeDimensions();
-      if (dims && (dims.cols !== oldCols || dims.rows !== oldRows)) {
-        api.resizePty(sid, dims.cols, dims.rows).catch(() => {});
-        inst.term.refresh(0, inst.term.rows - 1);
-      }
-    } catch { /* ignore */ }
-  }
-}
-
 export function TerminalPanel() {
   const {
     sessions,
@@ -136,8 +93,7 @@ export function TerminalPanel() {
   // ── PTY event listeners (set up once on mount) ──
   useEffect(() => {
     const unlistenOut = onPtyOutput((payload: PtyOutputEvent) => {
-      const instances = termInstancesRef.current;
-      const inst = instances.get(payload.session_id);
+      const inst = termInstancesRef.current.get(payload.session_id);
       if (inst) {
         inst.term.write(payload.data);
       } else {
@@ -149,16 +105,9 @@ export function TerminalPanel() {
     }).catch(() => () => {});
 
     const unlistenExit = onPtyExit((payload: PtyExitEvent) => {
-      const msg = "\r\n\x1b[33m[进程已退出]\x1b[0m\r\n";
-      const instances = termInstancesRef.current;
-      const inst = instances.get(payload.session_id);
+      const inst = termInstancesRef.current.get(payload.session_id);
       if (inst) {
-        inst.term.write(msg);
-      } else {
-        if (!pendingOutputRef.current.has(payload.session_id)) {
-          pendingOutputRef.current.set(payload.session_id, []);
-        }
-        pendingOutputRef.current.get(payload.session_id)!.push(msg);
+        inst.term.write("\r\n\x1b[33m[进程已退出]\x1b[0m\r\n");
       }
     }).catch(() => () => {});
 
@@ -168,60 +117,89 @@ export function TerminalPanel() {
     };
   }, []);
 
-  // ── Unified layout: sync xterm instances + compute grid + refit ──
-  // Single entry point for: sessions add/remove, group switch,
-  // session selection, split mode toggle.
+  // ── Unified layout effect ──
   useLayoutEffect(() => {
     const instances = termInstancesRef.current;
     const root = containerRootRef.current;
     if (!root) return;
 
-    // ── 1. Sync xterm instances with sessions ──
+    // ── 1. Dispose removed sessions ──
     for (const [sid, inst] of instances) {
       if (!sessions.some((s) => s.id === sid)) {
         inst.term.dispose();
-        if (inst.container.parentNode) {
-          inst.container.parentNode.removeChild(inst.container);
-        }
+        if (inst.container.parentNode) inst.container.parentNode.removeChild(inst.container);
         instances.delete(sid);
       }
     }
 
+    // ── 2. Visible IDs ──
+    const allIds = activeGroupSessions.map((s) => s.id);
+    const visibleIds = splitMode
+      ? allIds
+      : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
+    const count = visibleIds.length;
+
+    // ── 3. Apply layout + show/hide ──
+    if (count === 0) {
+      root.className = "terminal-container";
+      root.style.display = "";
+      root.style.gridTemplateColumns = "";
+      root.style.gridTemplateRows = "";
+    } else {
+      root.className = "terminal-container split-mode";
+      root.style.display = "grid";
+      if (count <= 2) {
+        root.style.gridTemplateColumns = count === 1 ? "1fr" : "1fr 1fr";
+        root.style.gridTemplateRows = "1fr";
+      } else {
+        root.style.gridTemplateColumns = "1fr 1fr";
+        root.style.gridTemplateRows = "1fr 1fr";
+      }
+    }
+
+    for (const [sid, inst] of instances) {
+      const i = visibleIds.indexOf(sid);
+      const visible = i >= 0;
+      inst.container.style.display = visible ? "block" : "none";
+      if (visible && count === 3 && i === 0) {
+        inst.container.style.gridRow = "1 / 3";
+      } else {
+        inst.container.style.gridRow = "";
+      }
+      inst.container.style.gridColumn = "";
+      inst.container.classList.toggle("active", sid === selectedSessionId);
+      inst.container.style.outline = sid === selectedSessionId ? "1px solid #60cdff" : "";
+    }
+
+    // ── 4. Create xterm for new sessions ──
     for (const session of sessions) {
       if (instances.has(session.id)) continue;
 
       const container = document.createElement("div");
       container.className = "term-instance";
       container.dataset.sid = session.id;
+      const i = visibleIds.indexOf(session.id);
+      container.style.display = i >= 0 ? "block" : "none";
+      if (i >= 0 && count === 3 && i === 0) container.style.gridRow = "1 / 3";
+      container.classList.toggle("active", session.id === selectedSessionId);
+      container.style.outline = session.id === selectedSessionId ? "1px solid #60cdff" : "";
       root.appendChild(container);
 
       const term = new Terminal({
-        cursorBlink: true,
-        cursorStyle: "bar",
-        cursorInactiveStyle: "none",
-        cursorWidth: 2,
-        fontSize: 14,
-        lineHeight: 1.2,
+        cursorBlink: true, cursorStyle: "bar", cursorInactiveStyle: "none", cursorWidth: 2,
+        fontSize: 14, lineHeight: 1.2,
         fontFamily: "'Cascadia Code', 'Cascadia Mono', 'Consolas', 'Courier New', monospace",
-        theme: TERM_THEME,
-        allowTransparency: false,
-        drawBoldTextInBrightColors: true,
+        theme: TERM_THEME, allowTransparency: false, drawBoldTextInBrightColors: true,
         letterSpacing: 0,
       });
 
       term.attachCustomKeyEventHandler((e) => {
         if (e.type === "keydown" && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === "v") {
           e.preventDefault();
-          navigator.clipboard.readText()
-            .then((text) => {
-              api.writePty(session.id, text).catch(() => {});
-            })
-            .catch(() => {});
+          navigator.clipboard.readText().then((t) => api.writePty(session.id, t).catch(() => {})).catch(() => {});
           return false;
         }
-        if (e.type === "keydown" && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.key === "V") {
-          return true;
-        }
+        if (e.type === "keydown" && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.key === "V") return true;
         if (e.type === "keydown" && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === "Enter") {
           api.writePty(session.id, "\n").catch(() => {});
           return false;
@@ -233,110 +211,62 @@ export function TerminalPanel() {
       term.loadAddon(fitAddon);
       term.open(container);
 
-      try {
-        fitAddon.fit();
-        const dims = fitAddon.proposeDimensions();
-        if (dims) {
-          api.resizePty(session.id, dims.cols, dims.rows).catch(() => {});
-        }
-      } catch { /* ignore */ }
-
-      container.addEventListener("click", () => {
-        onSelectRef.current(session.id);
-      });
-
+      container.addEventListener("click", () => onSelectRef.current(session.id));
       term.onData((data) => {
-        api.writePty(session.id, data).catch(() => {
-          term.write(data);
-        });
+        api.writePty(session.id, data).catch(() => term.write(data));
       });
 
       instances.set(session.id, { term, fitAddon, container });
 
       const buf = pendingOutputRef.current.get(session.id);
       if (buf && buf.length > 0) {
-        for (const chunk of buf) {
-          term.write(chunk);
-        }
+        term.write(buf.join(""));
         pendingOutputRef.current.delete(session.id);
       }
     }
 
-    // ── 2. Compute visible sessions and apply grid layout ──
-    const allIds = activeGroupSessions.map((s) => s.id);
-    const visibleIds = splitMode
-      ? allIds
-      : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
-    const count = visibleIds.length;
-
-    for (const [sid, inst] of instances) {
-      if (sid === selectedSessionId) continue;
-      inst.container.style.display = "none";
-      inst.container.classList.remove("active");
-      inst.container.style.outline = "";
-      inst.container.style.gridRow = "";
-      inst.container.style.gridColumn = "";
-    }
-
+    // ── 5. Fit + refresh + focus on the session whose size changed ──
     if (count > 0) {
-      const layout = getGridLayout(count);
-      root.className = "terminal-container split-mode";
-      root.style.display = "grid";
-      root.style.gridTemplateColumns = layout.cols;
-      root.style.gridTemplateRows = layout.rows;
-
-      visibleIds.forEach((sid, i) => {
+      void root.offsetHeight;
+      for (const sid of visibleIds) {
         const inst = instances.get(sid);
-        if (!inst) return;
-        inst.container.style.display = "block";
-        const pos = layout.positions[i];
-        inst.container.style.gridRow = pos?.gridRow ?? "";
-        inst.container.style.gridColumn = pos?.gridColumn ?? "";
-        const isActive = sid === selectedSessionId;
-        inst.container.classList.toggle("active", isActive);
-        inst.container.style.outline = isActive ? "1px solid #60cdff" : "";
-
-        let overlay = inst.container.querySelector(".term-ime-guard") as HTMLDivElement | null;
-        if (isActive) {
-          if (overlay) overlay.remove();
-        } else if (!overlay) {
-          overlay = document.createElement("div");
-          overlay.className = "term-ime-guard";
-          overlay.addEventListener("click", (e) => {
-            e.stopPropagation();
-            onSelectRef.current(sid);
-          });
-          inst.container.appendChild(overlay);
-        }
-      });
-      if (selectedSessionId) {
-        const inst = instances.get(selectedSessionId);
-        if (inst) {
-          inst.term.focus();
-          requestAnimationFrame(() => {
-            if (!inst.container.isConnected) return;
-            const ta = inst.container.querySelector<HTMLTextAreaElement>(".xterm-helper-textarea");
-            if (ta) ta.focus();
-            inst.term.focus();
-          });
-        }
+        if (!inst) continue;
+        try {
+          inst.fitAddon.fit();
+          const dims = inst.fitAddon.proposeDimensions();
+          if (dims) api.resizePty(sid, dims.cols, dims.rows).catch(() => {});
+          inst.term.refresh(0, inst.term.rows - 1);
+        } catch { /* ignore */ }
       }
-    } else {
-      for (const [, inst] of instances) {
-        inst.container.style.display = "none";
-        inst.container.classList.remove("active");
-        inst.container.style.outline = "";
-      }
-      root.className = "terminal-container";
-      root.style.display = "";
-      root.style.gridTemplateColumns = "";
-      root.style.gridTemplateRows = "";
+      // Focus the first visible terminal — its container just got a new grid
+      // span (gridRow: 1/3 → 100 % height) and focus() triggers xterm's
+      // internal redraw, ensuring canvas catches up.
+      const first = instances.get(visibleIds[0]);
+      if (first) first.term.focus();
     }
 
-    // ── 3. Refit after browser paint ──
-    setTimeout(() => {
-      refitVisible(visibleIds, termInstancesRef.current);
-    }, 0);
+    // ── 6. IME guard ──
+    for (const [sid, inst] of instances) {
+      let overlay = inst.container.querySelector(".term-ime-guard") as HTMLDivElement | null;
+      if (sid === selectedSessionId) {
+        if (overlay) overlay.remove();
+      } else if (visibleIds.includes(sid) && !overlay) {
+        overlay = document.createElement("div");
+        overlay.className = "term-ime-guard";
+        overlay.addEventListener("click", (e) => { e.stopPropagation(); onSelectRef.current(sid); });
+        inst.container.appendChild(overlay);
+      }
+    }
+
+    // ── 7. Focus after render settles ──
+    if (selectedSessionId && visibleIds.includes(selectedSessionId)) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const inst = termInstancesRef.current.get(selectedSessionId);
+          if (inst) inst.term.focus();
+        });
+      });
+    }
   }, [sessions, activeGroupSessions, selectedSessionId, splitMode]);
 
   // ── Refit on container resize ──
@@ -352,7 +282,16 @@ export function TerminalPanel() {
         const ids = splitMode
           ? allIds
           : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
-        refitVisible(ids, termInstancesRef.current);
+        for (const sid of ids) {
+          const inst = termInstancesRef.current.get(sid);
+          if (!inst) continue;
+          try {
+            inst.fitAddon.fit();
+            const dims = inst.fitAddon.proposeDimensions();
+            if (dims) api.resizePty(sid, dims.cols, dims.rows).catch(() => {});
+            inst.term.refresh(0, inst.term.rows - 1);
+          } catch { /* ignore */ }
+        }
       }, 250);
     });
     observer.observe(root);
