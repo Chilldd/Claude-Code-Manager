@@ -113,7 +113,7 @@ fn create_pty(
     debug_log("metrics locked, sending TrackSession");
     metrics.send(metrics::MetricsCmd::TrackSession {
         session_id: session_id.clone(),
-        root_pids,
+        root_pids: root_pids.clone(),
     });
     debug_log("TrackSession sent");
 
@@ -124,7 +124,7 @@ fn create_pty(
         pty::SessionCreatedPayload {
             session_id: session_id.clone(),
             workspace_id,
-            root_pids: vec![],
+            root_pids,
         },
     ) {
         eprintln!("[main] Failed to emit session-created: {}", e);

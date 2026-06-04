@@ -78,6 +78,12 @@ pub struct ClaudeAgentInfo {
 /// Internally uses `Arc<Mutex<HashMap>>` so the handle can be shared freely.
 pub struct ClaudeAgentMonitor {
     store: Arc<Mutex<HashMap<String, ClaudeAgentInfo>>>,
+    /// Maps PID → first-seen session_id.
+    /// When a claude process calls `resume` its `claude agents --json` session_id
+    /// changes, but the PID stays the same.  We cache the original session_id so
+    /// the frontend can keep matching by the stable ID it already knows.
+    #[allow(dead_code)]
+    pid_cache: Arc<Mutex<HashMap<u32, String>>>,
 }
 
 impl ClaudeAgentMonitor {
@@ -86,16 +92,19 @@ impl ClaudeAgentMonitor {
     pub fn spawn(app_handle: tauri::AppHandle) -> Self {
         let store: Arc<Mutex<HashMap<String, ClaudeAgentInfo>>> =
             Arc::new(Mutex::new(HashMap::new()));
-        let clone = Arc::clone(&store);
+        let pid_cache: Arc<Mutex<HashMap<u32, String>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let clone_store = Arc::clone(&store);
+        let clone_cache = Arc::clone(&pid_cache);
 
         std::thread::spawn(move || loop {
-            if let Err(e) = refresh_and_emit(&clone, &app_handle) {
+            if let Err(e) = refresh_and_emit(&clone_store, &clone_cache, &app_handle) {
                 debug_log(format!("[claude_agents] refresh failed: {}", e));
             }
             std::thread::sleep(Duration::from_millis(500));
         });
 
-        Self { store }
+        Self { store, pid_cache }
     }
 
     /// Look up agent info by session ID.
@@ -113,6 +122,7 @@ impl ClaudeAgentMonitor {
 /// Run `claude agents --json`, update store, and emit event to frontend.
 fn refresh_and_emit(
     store: &Mutex<HashMap<String, ClaudeAgentInfo>>,
+    pid_cache: &Mutex<HashMap<u32, String>>,
     app_handle: &tauri::AppHandle,
 ) -> Result<(), String> {
     let mut cmd = std::process::Command::new("claude");
@@ -135,11 +145,28 @@ fn refresh_and_emit(
             )
         })?;
 
-    // Build map and clone for emission (keep the original for store)
+    // Build agents map keyed by stable (first-seen) session_id.
+    // When a claude process calls `resume` its session_id in `claude agents --json`
+    // changes but the PID stays the same — pid_cache holds the original session_id
+    // so the frontend can keep matching by the ID it already knows.
+    let active_pids: Vec<u32> = agents.iter().map(|a| a.pid).collect();
+    let mut cache = pid_cache.lock().map_err(|e| format!("pid_cache lock: {}", e))?;
+
+    // Evict stale entries for processes that have exited
+    cache.retain(|pid, _| active_pids.contains(pid));
+
     let agents_map: HashMap<String, ClaudeAgentInfo> = agents
         .into_iter()
-        .map(|a| (a.session_id.clone(), a))
+        .map(|a| {
+            let stable_id = cache
+                .entry(a.pid)
+                .or_insert_with(|| a.session_id.clone());
+            (stable_id.clone(), a)
+        })
         .collect();
+
+    // Release pid_cache lock before emitting
+    drop(cache);
 
     // Emit to frontend *before* storing to minimize latency
     app_handle
