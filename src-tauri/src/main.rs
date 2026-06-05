@@ -84,6 +84,8 @@ fn create_pty(
     cwd: String,
     env: std::collections::HashMap<String, String>,
     inject_session_id: Option<bool>,
+    cols: Option<u16>,
+    rows: Option<u16>,
 ) -> Result<String, AppError> {
     debug_log(format!("create_pty: sid={}, cmd={}, args={}, cwd={}", &session_id, command, args, cwd));
     let inject = inject_session_id.unwrap_or(true);
@@ -104,6 +106,8 @@ fn create_pty(
         &cwd,
         env,
         inject,
+        cols.unwrap_or(120),
+        rows.unwrap_or(48),
     ).map_err(|e| {
         debug_log(format!("pty.create FAILED: {}", e));
         AppError::PtyError(e)

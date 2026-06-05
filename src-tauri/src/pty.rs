@@ -160,6 +160,8 @@ impl PtyManager {
         cwd: &str,
         env: HashMap<String, String>,
         inject_session_id: bool,
+        cols: u16,
+        rows: u16,
     ) -> Result<(String, Vec<u32>), String> {
         let mut args = parse_args(args);
 
@@ -172,8 +174,8 @@ impl PtyManager {
         let pty_system = NativePtySystem::default();
         let pair = pty_system
             .openpty(PtySize {
-                rows: 48,
-                cols: 120,
+                rows: if rows > 0 { rows } else { 48 },
+                cols: if cols > 0 { cols } else { 120 },
                 pixel_width: 0,
                 pixel_height: 0,
             })

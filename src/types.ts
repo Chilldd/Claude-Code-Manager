@@ -2,7 +2,7 @@
 
 import type { SessionBackendState } from "./api";
 
-export type SessionStatus = "running" | "thinking" | "idle" | "attention" | "exited" | "waiting";
+export type SessionStatus = "pending" | "running" | "thinking" | "idle" | "attention" | "exited" | "waiting";
 
 export interface SessionInfo {
   id: string;

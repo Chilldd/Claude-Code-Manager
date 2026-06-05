@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+﻿import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -12,7 +12,7 @@ import { SessionTabs } from "./SessionTabs";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
 import styles from "./TerminalPanel.module.css";
 
-/* ── Windows Terminal "Dark+" (Campbell) color scheme ── */
+/* ── Windows Terminal "Dark+" (Campbell) 配色 ── */
 const TERM_THEME = {
   background: "#0c0c0c",
   foreground: "#cccccc",
@@ -57,6 +57,9 @@ export function TerminalPanel() {
     moveSessionToGroup,
     addGroup,
     deleteGroup,
+    resolvePendingDims,
+    rejectPendingDims,
+    terminalPanelMountedRef,
   } = useSession();
 
   const containerRootRef = useRef<HTMLDivElement>(null);
@@ -64,17 +67,16 @@ export function TerminalPanel() {
   const pendingOutputRef = useRef<Map<string, string[]>>(new Map());
   const onSelectRef = useRef(selectSession);
   onSelectRef.current = selectSession;
-  // Tracks the last grid layout key; when unchanged, skip Step 6 (fit/refresh/focus)
-  // to avoid focus theft on session metadata-only changes (e.g. PTY title).
+  // 记录上次 grid 布局 key，未变时跳过 fit/resize 避免元数据更新抢焦点
   const prevGridKeyRef = useRef<string>("");
-  // Tracks last-known PTY dimensions per session to skip redundant resizePty calls.
+  // 记录各会话已知的 PTY 尺寸，避免重复发 resizePty
   const lastDimsRef = useRef<Map<string, { cols: number; rows: number }>>(new Map());
 
-  // Per-group split mode. Defaults to true (split) for any group.
+  // 每个分组的 split 模式（默认开启）
   const [splitModes, setSplitModes] = useState<Record<string, boolean>>({});
   const splitMode = splitModes[activeGroupId] ?? true;
 
-  // ── Group delete confirmation ──
+  // ── 删除分组确认弹窗 ──
   const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<string | null>(null);
   const handleConfirmDeleteGroup = useCallback(() => {
     if (confirmDeleteGroupId) {
@@ -83,7 +85,7 @@ export function TerminalPanel() {
     }
   }, [confirmDeleteGroupId, deleteGroup]);
 
-  // ── Session navigation via Ctrl+Arrow / Ctrl+Tab ──
+  // ── 会话切换快捷键（Ctrl+方向键 / Ctrl+Tab） ──
   const switchSessionRef = useRef<((dir: "prev" | "next") => void) | null>(null);
   switchSessionRef.current = (dir) => {
     const ids = activeGroupSessions.map((s) => s.id);
@@ -96,7 +98,7 @@ export function TerminalPanel() {
     selectSession(ids[nextIdx]);
   };
 
-  // ── PTY event listeners (set up once on mount) ──
+  // ── PTY 事件监听（只在挂载时设置一次） ──
   useEffect(() => {
     const unlistenOut = onPtyOutput((payload: PtyOutputEvent) => {
       const inst = termInstancesRef.current.get(payload.session_id);
@@ -123,13 +125,19 @@ export function TerminalPanel() {
     };
   }, []);
 
-  // ── Unified layout effect ──
+  // ── 通知 SessionManager 面板已挂载 ──
+  useEffect(() => {
+    terminalPanelMountedRef.current = true;
+    return () => { terminalPanelMountedRef.current = false; };
+  }, []);
+
+  // ── 统一布局 effect ──
   useLayoutEffect(() => {
     const instances = termInstancesRef.current;
     const root = containerRootRef.current;
     if (!root) return;
 
-    // ── 1. Dispose removed sessions ──
+    // ── 1. 清理已移除的会话 ──
     for (const [sid, inst] of instances) {
       if (!sessions.some((s) => s.id === sid)) {
         inst.term.dispose();
@@ -138,14 +146,14 @@ export function TerminalPanel() {
       }
     }
 
-    // ── 2. Visible IDs ──
+    // ── 2. 计算可见会话 ──
     const allIds = activeGroupSessions.map((s) => s.id);
     const visibleIds = splitMode
       ? allIds
       : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
     const count = visibleIds.length;
 
-    // ── 3. Apply root grid layout ──
+    // ── 3. 设置网格布局 ──
     if (count === 0) {
       root.className = "terminal-container";
       root.style.display = "";
@@ -163,7 +171,7 @@ export function TerminalPanel() {
       }
     }
 
-    // ── 4. Create xterm instances for new sessions ──
+    // ── 4. 为新会话创建 xterm 实例 ──
     for (const session of sessions) {
       if (instances.has(session.id)) continue;
 
@@ -199,7 +207,7 @@ export function TerminalPanel() {
       term.loadAddon(fitAddon);
       term.open(container);
 
-      // WebGL renderer — better text quality on Windows; falls back to canvas on failure
+      // WebGL 渲染器（Windows 上渲染更好），失败则降级到 Canvas
       try {
         term.loadAddon(new WebglAddon());
       } catch (e) {
@@ -220,7 +228,7 @@ export function TerminalPanel() {
       }
     }
 
-    // ── 5. Apply visual style (display/gridRow/active/outline) to ALL instances ──
+    // ── 5. 应用显示样式（display/gridRow/active/outline） ──
     for (const [sid, inst] of instances) {
       const i = visibleIds.indexOf(sid);
       const visible = i >= 0;
@@ -235,44 +243,63 @@ export function TerminalPanel() {
       inst.container.style.outline = sid === selectedSessionId ? "1px solid #60cdff" : "";
     }
 
-    // ── 6. Fit + refresh + focus — only when grid layout changed ──
-    // Guard: skip on metadata-only changes (PTY title, session status) to
-    // avoid stealing focus from non-terminal inputs.
+    // ── 6. 计算尺寸 + 调整 PTY + 处理 pending 会话 ──
+    // 仅在网格布局变化时执行，避免元数据更新（PTY 标题、状态）抢焦点
     const gridKey = count + "|" + (count > 0 ? visibleIds.join("|") : "");
     const gridChanged = gridKey !== prevGridKeyRef.current;
     prevGridKeyRef.current = gridKey;
 
     if (gridChanged && count > 0) {
       void root.offsetHeight;
+      const pendingList: Array<{ sid: string; inst: TermInstance }> = [];
       for (const sid of visibleIds) {
         const inst = instances.get(sid);
         if (!inst) continue;
         try {
-          inst.fitAddon.fit();
-          const dims = inst.fitAddon.proposeDimensions();
-          if (dims) {
-            const prevDims = lastDimsRef.current.get(sid);
-            if (!prevDims || prevDims.cols !== dims.cols || prevDims.rows !== dims.rows) {
-              api.resizePty(sid, dims.cols, dims.rows).catch(() => {});
-              lastDimsRef.current.set(sid, { cols: dims.cols, rows: dims.rows });
+          const session = sessions.find((s) => s.id === sid);
+          if (session?.status === "pending") {
+            // 新终端：渲染器字符测量尚未完成，放 rAF 里等
+            pendingList.push({ sid, inst });
+          } else {
+            // 已有终端：直接在 layout effect 里 resize
+            inst.fitAddon.fit();
+            const cols = inst.term.cols;
+            const rows = inst.term.rows;
+            if (cols > 0 && rows > 0) {
+              const prevDims = lastDimsRef.current.get(sid);
+              if (!prevDims || prevDims.cols !== cols || prevDims.rows !== rows) {
+                api.resizePty(sid, cols, rows).catch(() => {});
+                lastDimsRef.current.set(sid, { cols, rows });
+              }
             }
           }
-          inst.term.refresh(0, inst.term.rows - 1);
         } catch (e) {
-          api.debugLog(`[TerminalPanel] fit/refresh error in LayoutEffect sid=${sid}: ${e}`);
+          api.debugLog(`[TerminalPanel] fit error sid=${sid}: ${e}`);
         }
       }
-      // Focus the first visible terminal — its container just got a new grid
-      // span (gridRow: 1/3 → 100 % height) and focus() triggers xterm's
-      // internal redraw, ensuring canvas catches up.
-      // NOTE: if the textarea is already focused (user typing in this terminal),
-      // focus() is a no-op and sync redraw is skipped. In practice the canvas
-      // was already updated by fit() → term.resize() so the impact is minimal.
-      const first = instances.get(visibleIds[0]);
-      if (first) first.term.focus();
+      // pending 终端：rAF 后渲染器就绪再 fit + resolve
+      if (pendingList.length > 0) {
+        requestAnimationFrame(() => {
+          for (const { sid, inst } of pendingList) {
+            try {
+              inst.fitAddon.fit();
+              resolvePendingDims(sid, { cols: inst.term.cols, rows: inst.term.rows });
+            } catch (e) {
+              api.debugLog(`[TerminalPanel] rAF fit error sid=${sid}: ${e}`);
+            }
+          }
+        });
+      }
+      // 焦点
+      if (selectedSessionId && visibleIds.includes(selectedSessionId)) {
+        requestAnimationFrame(() => {
+          const inst = termInstancesRef.current.get(selectedSessionId);
+          if (inst) inst.term.focus();
+        });
+      }
     }
 
-    // ── 7. IME guard ──
+    // ── 7. IME 防护层 ──
     for (const [sid, inst] of instances) {
       let overlay = inst.container.querySelector(".term-ime-guard") as HTMLDivElement | null;
       if (sid === selectedSessionId) {
@@ -287,60 +314,63 @@ export function TerminalPanel() {
       }
     }
 
-    // ── 8. Focus after render settles ──
-    if (selectedSessionId && visibleIds.includes(selectedSessionId)) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const inst = termInstancesRef.current.get(selectedSessionId);
-          if (inst) inst.term.focus();
-        });
-      });
-    }
   }, [sessions, activeGroupSessions, selectedSessionId, splitMode]);
 
 
-  // ── Refit on container resize ──
+  // ── 容器 resize 时重新计算终端尺寸 ──
+  const splitModeRef = useRef(splitMode);
+  splitModeRef.current = splitMode;
+  const activeGroupSessionsRef = useRef(activeGroupSessions);
+  activeGroupSessionsRef.current = activeGroupSessions;
+  const selectedSessionIdRef = useRef(selectedSessionId);
+  selectedSessionIdRef.current = selectedSessionId;
+
   useEffect(() => {
     const root = containerRootRef.current;
     if (!root) return;
 
-    let timer: ReturnType<typeof setTimeout>;
-    const observer = new ResizeObserver(() => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const allIds = activeGroupSessions.map((s) => s.id);
-        const ids = splitMode
-          ? allIds
-          : (selectedSessionId && allIds.includes(selectedSessionId) ? [selectedSessionId] : allIds.slice(0, 1));
-        for (const sid of ids) {
-          const inst = termInstancesRef.current.get(sid);
-          if (!inst) continue;
-          try {
-            inst.fitAddon.fit();
-            const dims = inst.fitAddon.proposeDimensions();
-            if (dims) {
-              const prevDims = lastDimsRef.current.get(sid);
-              if (!prevDims || prevDims.cols !== dims.cols || prevDims.rows !== dims.rows) {
-                api.resizePty(sid, dims.cols, dims.rows).catch(() => {});
-                lastDimsRef.current.set(sid, { cols: dims.cols, rows: dims.rows });
-              }
+    let rafId: number | undefined;
+
+    const doResize = () => {
+      rafId = undefined;
+      const allIds = activeGroupSessionsRef.current.map((s) => s.id);
+      const currentSplit = splitModeRef.current;
+      const currentSelected = selectedSessionIdRef.current;
+      const ids = currentSplit
+        ? allIds
+        : (currentSelected && allIds.includes(currentSelected) ? [currentSelected] : allIds.slice(0, 1));
+      for (const sid of ids) {
+        const inst = termInstancesRef.current.get(sid);
+        if (!inst) continue;
+        try {
+          inst.fitAddon.fit();
+          const cols = inst.term.cols;
+          const rows = inst.term.rows;
+          if (cols > 0 && rows > 0) {
+            const prevDims = lastDimsRef.current.get(sid);
+            if (!prevDims || prevDims.cols !== cols || prevDims.rows !== rows) {
+              api.resizePty(sid, cols, rows).catch(() => {});
+              lastDimsRef.current.set(sid, { cols, rows });
             }
-            inst.term.refresh(0, inst.term.rows - 1);
-          } catch (e) {
-            api.debugLog(`[TerminalPanel] fit/refresh error in ResizeObserver sid=${sid}: ${e}`);
           }
+        } catch (e) {
+          api.debugLog(`[TerminalPanel] resize error sid=${sid}: ${e}`);
         }
-      }, 250);
+      }
+    };
+
+    const observer = new ResizeObserver(() => {
+      if (rafId !== undefined) return;
+      rafId = requestAnimationFrame(doResize);
     });
     observer.observe(root);
     return () => {
       observer.disconnect();
-      clearTimeout(timer);
+      if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeGroupSessions.length, splitMode, selectedSessionId]);
+  }, []);
 
-  // ── Global keyboard shortcuts ──
+  // ── 全局键盘快捷键 ──
   useEffect(() => {
     const onCapture = (e: KeyboardEvent) => {
       const target = e.target;
@@ -366,7 +396,7 @@ export function TerminalPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Render ──
+  // ── 渲染 ──
   const hasSessions = sessions.length > 0;
   const groupTabs = groups.map((g) => ({
     id: g.id,

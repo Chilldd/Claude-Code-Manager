@@ -54,6 +54,11 @@ export interface SessionManager {
   moveSessionToGroup: (sessionId: string, targetGroupId: string) => void;
   addGroup: () => void;
   deleteGroup: (groupId: string) => void;
+
+  /** Called by TerminalPanel to pass back real terminal dimensions for a pending session. */
+  resolvePendingDims: (sessionId: string, dims: {cols: number; rows: number}) => void;
+  rejectPendingDims: (sessionId: string, error: Error) => void;
+  terminalPanelMountedRef: React.MutableRefObject<boolean>;
 }
 
 export function useSessionManager(): SessionManager {
@@ -79,6 +84,58 @@ export function useSessionManager(): SessionManager {
   const nextSessionIndex = useCallback(() => {
     sessionCounterRef.current += 1;
     return sessionCounterRef.current;
+  }, []);
+
+  // ── Terminal dimensions coordination (between launchSession and TerminalPanel) ──
+  const pendingDimsResolversRef = useRef<Map<string, {
+    resolve: (dims: { cols: number; rows: number }) => void;
+    reject: (err: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>>(new Map());
+
+  /** Tracks pending sessions cleaned up by stopSession/deleteGroup to avoid double cleanup in launchSession catch. */
+  const cleanedPendingSessionsRef = useRef<Set<string>>(new Set());
+
+  /** Whether TerminalPanel is currently mounted. When false, skip pending flow. */
+  const terminalPanelMountedRef = useRef(false);
+
+  const waitForTerminalDims = useCallback(async (sessionId: string): Promise<{cols: number; rows: number}> => {
+    if (!terminalPanelMountedRef.current) {
+      // TerminalPanel not mounted — skip pending flow, use reasonable defaults
+      return { cols: 120, rows: 48 };
+    }
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pendingDimsResolversRef.current.delete(sessionId);
+        api.debugLog(`[TerminalPanel] dims timeout for ${sessionId}, using fallback 120x48`);
+        // Timeout resolves with fallback so session creation can proceed.
+        // The subsequent fit() → resizePty() will correct the size.
+        resolve({ cols: 120, rows: 48 });
+      }, 500);
+      pendingDimsResolversRef.current.set(sessionId, {
+        resolve: (dims) => { clearTimeout(timer); resolve(dims); },
+        reject: (err) => { clearTimeout(timer); reject(err); },
+        timer,
+      });
+    });
+  }, []);
+
+  const resolvePendingDims = useCallback((sessionId: string, dims: {cols: number; rows: number}) => {
+    const entry = pendingDimsResolversRef.current.get(sessionId);
+    if (entry) {
+      clearTimeout(entry.timer);
+      entry.resolve(dims);
+      pendingDimsResolversRef.current.delete(sessionId);
+    }
+  }, []);
+
+  const rejectPendingDims = useCallback((sessionId: string, error: Error) => {
+    const entry = pendingDimsResolversRef.current.get(sessionId);
+    if (entry) {
+      clearTimeout(entry.timer);
+      entry.reject(error);
+      pendingDimsResolversRef.current.delete(sessionId);
+    }
   }, []);
 
   // Active group's session IDs
@@ -358,22 +415,11 @@ export function useSessionManager(): SessionManager {
         worktreeName = undefined;
       }
 
-      api.debugLog(`launchSession: calling createPty sid=${sessionId} cmd=${ws.command} args=${resolvedArgs} injectSessionId=${injectSessionId}`);
-      try {
-        await api.createPty(
-          sessionId,
-          ws.id,
-          sessionName,
-          ws.command,
-          resolvedArgs,
-          ws.path,
-          ws.env,
-          injectSessionId
-        );
-        api.debugLog(`launchSession: createPty OK sid=${sessionId}`);
+      api.debugLog(`launchSession: adding pending session sid=${sessionId}`);
 
-        // Step 1/4: add session to state
-        api.debugLog("launchSession: step1 setSessions");
+      try {
+        // ── Step 1: add pending session to state ──
+        // Triggers React re-render → TerminalPanel layout effect creates xterm → fit() measures real size
         setSessions((prev) => [
           ...prev,
           {
@@ -382,19 +428,13 @@ export function useSessionManager(): SessionManager {
             workspaceName: ws.name,
             name: sessionName,
             sessionIndex,
-            status: "running" as const,
+            status: "pending" as const,
             worktreeName,
           },
         ]);
-        api.debugLog("launchSession: step1 setSessions done");
-
-        api.debugLog("launchSession: step2 setSelectedSessionId");
         setSelectedSessionId(sessionId);
-        api.debugLog("launchSession: step2 done");
 
-        // Step 3/4: assign session to a group
-        // 使用 ref 读取最新 groups，避免 useCallback 闭包捕获过期值
-        api.debugLog("launchSession: step3 setGroups");
+        // ── Step 2: assign to a group ──
         const latestGroups = groupsRef.current;
         const currentGroup = latestGroups.find((g) => g.id === activeGroupIdRef.current);
         if (currentGroup && currentGroup.sessionIds.length < MAX_GROUP_SIZE) {
@@ -410,8 +450,36 @@ export function useSessionManager(): SessionManager {
           setGroups((prev) => [...prev, { id, name, sessionIds: [sessionId] }]);
           setActiveGroupId(id);
         }
-        api.debugLog("launchSession: step3 setGroups done");
 
+        // ── Step 3: wait for TerminalPanel to measure real terminal dimensions ──
+        // useLayoutEffect creates container + xterm, calls fit(), then resolvePendingDims()
+        const dims = await waitForTerminalDims(sessionId);
+        api.debugLog(`launchSession: got dims ${dims.cols}x${dims.rows} for sid=${sessionId}`);
+
+        // ── Step 4: create PTY with correct terminal size ──
+        // PTY starts at the right size — no resizePty needed after this
+        await api.createPty(
+          sessionId,
+          ws.id,
+          sessionName,
+          ws.command,
+          resolvedArgs,
+          ws.path,
+          ws.env,
+          injectSessionId,
+          dims.cols,
+          dims.rows
+        );
+        api.debugLog(`launchSession: createPty OK sid=${sessionId}`);
+
+        // ── Step 5: mark session as running ──
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === sessionId ? { ...s, status: "running" as const } : s
+          )
+        );
+
+        // ── Step 6: send auto_prompt if configured ──
         if (ws.auto_prompt && strategy?.type !== "resume") {
           setTimeout(() => {
             api.writePty(sessionId, ws.auto_prompt + "\n").catch(() => {});
@@ -419,17 +487,51 @@ export function useSessionManager(): SessionManager {
         }
         api.debugLog("launchSession: ALL STEPS COMPLETE");
       } catch (e) {
-        api.debugLog(`launchSession CAUGHT: ${e}`);
-        // notifySession hook placeholder
+        api.debugLog(`launchSession FAILED: ${e}`);
+
+        // Clean up pending dims resolver (may have been removed by stopSession already)
+        const entry = pendingDimsResolversRef.current.get(sessionId);
+        if (entry) {
+          clearTimeout(entry.timer);
+          pendingDimsResolversRef.current.delete(sessionId);
+        }
+
+        // If stopSession/deleteGroup already handled state cleanup, skip
+        if (cleanedPendingSessionsRef.current.has(sessionId)) {
+          cleanedPendingSessionsRef.current.delete(sessionId);
+        } else if (sessionsRef.current.some((s) => s.id === sessionId)) {
+          setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+          setSelectedSessionId(null);
+          setGroups((prev) => {
+            const filtered = prev
+              .map((g) => ({ ...g, sessionIds: g.sessionIds.filter((id) => id !== sessionId) }))
+              .filter((g) => g.sessionIds.length > 0);
+            return filtered.length > 0 ? filtered : [{ id: "g1", name: "Group 1", sessionIds: [] }];
+          });
+        }
+
+        // Propagate to caller (App.tsx sets ptyError)
+        throw e;
       }
     },
     [nextSessionIndex]
   );
 
   const stopSession = useCallback(async (sessionId: string) => {
-    try {
-      await api.killPty(sessionId);
-    } catch { /* ignore */ }
+    // If session is still pending (PTY not yet created), reject the dims promise
+    // so launchSession's catch block can clean up.
+    const pendingEntry = pendingDimsResolversRef.current.get(sessionId);
+    if (pendingEntry) {
+      clearTimeout(pendingEntry.timer);
+      cleanedPendingSessionsRef.current.add(sessionId);
+      pendingEntry.reject(new Error("Session stopped while pending"));
+      pendingDimsResolversRef.current.delete(sessionId);
+      // Don't call killPty — PTY hasn't been created yet
+    } else {
+      try {
+        await api.killPty(sessionId);
+      } catch { /* ignore */ }
+    }
 
     // Compute what happens to groups when this session is removed
     const remainingGroups = groups
@@ -530,6 +632,14 @@ export function useSessionManager(): SessionManager {
     if (group) {
       const ids = group.sessionIds;
       for (const sid of ids) {
+        // Clean up any pending dims promises first
+        const pendingEntry = pendingDimsResolversRef.current.get(sid);
+        if (pendingEntry) {
+          clearTimeout(pendingEntry.timer);
+          cleanedPendingSessionsRef.current.add(sid);
+          pendingEntry.reject(new Error("Group deleted while session pending"));
+          pendingDimsResolversRef.current.delete(sid);
+        }
         api.killPty(sid).catch(() => {});
       }
       setSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
@@ -575,5 +685,8 @@ export function useSessionManager(): SessionManager {
     moveSessionToGroup,
     addGroup,
     deleteGroup,
+    resolvePendingDims,
+    rejectPendingDims,
+    terminalPanelMountedRef,
   };
 }
